@@ -1,0 +1,529 @@
+import { useMemo, useState } from 'react';
+import { motion } from 'framer-motion';
+import toast from 'react-hot-toast';
+import {
+  ArrowLeft,
+  Car,
+  AlertTriangle,
+  Clock,
+  Wrench,
+  FileText,
+  Plus,
+  Save,
+  Trash,
+  Camera,
+  Search,
+  SlidersHorizontal
+} from 'lucide-react';
+import { api } from './api';
+import { Button, Input, Card, Badge } from './Ui';
+import type { Vehicle } from './types';
+
+interface VehiclesViewProps {
+  vehicles: Vehicle[];
+  onRefresh: () => void;
+}
+
+type Mode = 'list' | 'form' | 'detail' | 'service';
+
+const statusColors: Record<string, 'green' | 'amber' | 'red' | 'neutral'> = {
+  up_to_date: 'green',
+  due_soon: 'amber',
+  overdue: 'red',
+  unknown: 'neutral'
+};
+
+export function VehiclesView({ vehicles, onRefresh }: VehiclesViewProps) {
+  const [mode, setMode] = useState<Mode>('list');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState('all');
+
+  const selected = useMemo(
+    () => vehicles.find((v) => v.id === selectedId) || null,
+    [vehicles, selectedId]
+  );
+
+  const filtered = useMemo(() => {
+    let list = vehicles;
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter(
+        (v) =>
+          v.displayName.toLowerCase().includes(q) ||
+          (v.make && v.make.toLowerCase().includes(q)) ||
+          (v.model && v.model.toLowerCase().includes(q)) ||
+          (v.vin && v.vin.toLowerCase().includes(q))
+      );
+    }
+    if (filter !== 'all') list = list.filter((v) => v.status === filter);
+    return list;
+  }, [vehicles, search, filter]);
+
+  const openDetail = (v: Vehicle) => {
+    setSelectedId(v.id);
+    setMode('detail');
+  };
+
+  const openForm = (v?: Vehicle) => {
+    setSelectedId(v?.id || null);
+    setMode('form');
+  };
+
+  const openService = (v: Vehicle) => {
+    setSelectedId(v.id);
+    setMode('service');
+  };
+
+  const backToList = () => {
+    setMode('list');
+    setSelectedId(null);
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -20 }}
+      className="pb-24"
+    >
+      {mode === 'list' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold">Vehicles</h2>
+            <Button onClick={() => openForm()} className="gap-2 p-3">
+              <Plus className="w-4 h-4" />
+            </Button>
+          </div>
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <Input
+                value={search}
+                onChange={setSearch}
+                placeholder="Search..."
+                className="!pl-9"
+              />
+            </div>
+            <select
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              className="rounded-xl border border-white/10 bg-base-900/60 px-3 text-sm text-slate-100"
+            >
+              <option value="all">All</option>
+              <option value="up_to_date">Good</option>
+              <option value="due_soon">Due soon</option>
+              <option value="overdue">Overdue</option>
+            </select>
+          </div>
+          {filtered.length === 0 ? (
+            <Card className="p-8 text-center text-slate-400">
+              <Car className="w-10 h-10 mx-auto text-slate-600 mb-3" />
+              No vehicles yet.
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {filtered.map((v) => (
+                <Card
+                  key={v.id}
+                  onClick={() => openDetail(v)}
+                  className="flex items-center gap-4 p-4 shine"
+                >
+                  <div className="shrink-0 w-16 h-16 rounded-xl bg-gradient-to-br from-base-800 to-base-700 overflow-hidden flex items-center justify-center">
+                    {v.coverPhoto ? (
+                      <img
+                        src={v.coverPhoto}
+                        alt=""
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <Car className="w-8 h-8 text-slate-500" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium truncate">{v.displayName}</div>
+                    <div className="text-xs text-slate-400 truncate">
+                      {v.year} {v.make} {v.model}
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      {v.currentMileage?.toLocaleString()} mi
+                    </div>
+                  </div>
+                  <Badge color={statusColors[v.status] || 'neutral'}>
+                    {v.status.replace(/_/g, ' ')}
+                  </Badge>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {mode === 'detail' && selected && (
+        <VehicleDetail
+          vehicle={selected}
+          onBack={backToList}
+          onEdit={() => openForm(selected)}
+          onAddService={() => openService(selected)}
+          onRefresh={onRefresh}
+        />
+      )}
+
+      {mode === 'form' && (
+        <VehicleForm
+          vehicle={selected || undefined}
+          onBack={backToList}
+          onSaved={() => {
+            onRefresh();
+            backToList();
+          }}
+        />
+      )}
+
+      {mode === 'service' && selected && (
+        <ServiceForm
+          vehicle={selected}
+          onBack={() => setMode('detail')}
+          onSaved={() => {
+            onRefresh();
+            setMode('detail');
+          }}
+        />
+      )}
+    </motion.div>
+  );
+}
+
+function VehicleDetail({
+  vehicle,
+  onBack,
+  onEdit,
+  onAddService,
+  onRefresh
+}: {
+  vehicle: Vehicle;
+  onBack: () => void;
+  onEdit: () => void;
+  onAddService: () => void;
+  onRefresh: () => void;
+}) {
+  const handlePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const form = new FormData();
+    form.append('photo', file);
+    try {
+      await api.post(`/vehicles/${vehicle.id}/photos`, form, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      toast.success('Photo updated');
+      onRefresh();
+    } catch (err) {
+      toast.error(String(err));
+    }
+  };
+
+  const exportPdf = () => {
+    window.open(`/api/exports/vehicle/${vehicle.id}/pdf`, '_blank');
+  };
+
+  const deleteVehicle = async () => {
+    if (!confirm('Archive this vehicle?')) return;
+    await api.delete(`/vehicles/${vehicle.id}`);
+    toast.success('Archived');
+    onRefresh();
+    onBack();
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <button onClick={onBack} className="p-2 rounded-full hover:bg-white/5">
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <h2 className="text-xl font-bold truncate">{vehicle.displayName}</h2>
+      </div>
+
+      <div className="relative h-48 rounded-2xl overflow-hidden bg-gradient-to-br from-base-800 to-base-700 flex items-center justify-center">
+        {vehicle.coverPhoto ? (
+          <img src={vehicle.coverPhoto} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <Car className="w-20 h-20 text-slate-600" />
+        )}
+        <label className="absolute bottom-3 right-3 glass rounded-xl p-2 cursor-pointer hover:bg-white/10 transition">
+          <Camera className="w-4 h-4" />
+          <input type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
+        </label>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <Badge color={statusColors[vehicle.status] || 'neutral'}>
+          {vehicle.status.replace(/_/g, ' ')}
+        </Badge>
+        <div className="text-sm text-slate-400">
+          {vehicle.currentMileage?.toLocaleString()} mi
+        </div>
+      </div>
+
+      {vehicle.status !== 'up_to_date' && vehicle.status !== 'unknown' && (
+        <Card className="p-4 border-l-4 border-l-amber-400 bg-amber-500/5">
+          <div className="flex items-start gap-3">
+            {vehicle.status === 'overdue' ? (
+              <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0" />
+            ) : (
+              <Clock className="w-5 h-5 text-amber-400 shrink-0" />
+            )}
+            <div>
+              <div className="font-medium">
+                {vehicle.status === 'overdue' ? 'Service overdue' : 'Service due soon'}
+              </div>
+              <div className="text-sm text-slate-400">
+                {vehicle.milesRemaining != null
+                  ? `${vehicle.milesRemaining.toLocaleString()} miles remaining`
+                  : 'Check service date'}
+                {vehicle.daysRemaining != null && ` · ${vehicle.daysRemaining} days`}
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      <div className="grid grid-cols-2 gap-3">
+        <Button onClick={onAddService} className="gap-2">
+          <Wrench className="w-4 h-4" /> Add service
+        </Button>
+        <Button onClick={exportPdf} variant="secondary" className="gap-2">
+          <FileText className="w-4 h-4" /> PDF
+        </Button>
+      </div>
+
+      <Card className="p-4 space-y-3">
+        <h3 className="font-semibold text-slate-200">Vehicle details</h3>
+        <DetailRow label="VIN" value={vehicle.vin} />
+        <DetailRow label="Year" value={vehicle.year} />
+        <DetailRow label="Make" value={vehicle.make} />
+        <DetailRow label="Model" value={vehicle.model} />
+        <DetailRow label="Engine" value={vehicle.engine} />
+        <DetailRow label="Plate" value={vehicle.licensePlate} />
+        <DetailRow label="Oil spec" value={`${vehicle.oilBrandPref} ${vehicle.oilViscosity}`} />
+        <DetailRow label="Filter" value={vehicle.filterPartNumber} />
+        <DetailRow label="Interval" value={`${vehicle.intervalMiles} mi / ${vehicle.intervalMonths} mo`} />
+        {vehicle.notes && <div className="text-sm text-slate-400 pt-2 border-t border-white/5">{vehicle.notes}</div>}
+      </Card>
+
+      <div className="flex gap-3">
+        <Button onClick={onEdit} variant="secondary" className="flex-1 gap-2">
+          <SlidersHorizontal className="w-4 h-4" /> Edit
+        </Button>
+        <Button onClick={deleteVehicle} variant="danger" className="flex-1 gap-2">
+          <Trash className="w-4 h-4" /> Archive
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
+  if (value === undefined || value === null || value === '') return null;
+  return (
+    <div className="flex justify-between text-sm">
+      <span className="text-slate-500">{label}</span>
+      <span className="text-slate-200">{value}</span>
+    </div>
+  );
+}
+
+function VehicleForm({
+  vehicle,
+  onBack,
+  onSaved
+}: {
+  vehicle?: Vehicle;
+  onBack: () => void;
+  onSaved: () => void;
+}) {
+  const [data, setData] = useState<Partial<Vehicle>>({
+    displayName: vehicle?.displayName ?? '',
+    vin: vehicle?.vin ?? '',
+    year: vehicle?.year,
+    make: vehicle?.make ?? '',
+    model: vehicle?.model ?? '',
+    engine: vehicle?.engine ?? '',
+    currentMileage: vehicle?.currentMileage,
+    licensePlate: vehicle?.licensePlate ?? '',
+    oilBrandPref: vehicle?.oilBrandPref ?? '',
+    oilViscosity: vehicle?.oilViscosity ?? '',
+    filterPartNumber: vehicle?.filterPartNumber ?? '',
+    intervalMiles: vehicle?.intervalMiles ?? 5000,
+    intervalMonths: vehicle?.intervalMonths ?? 6,
+    reminderLeadMiles: vehicle?.reminderLeadMiles ?? 500,
+    reminderLeadDays: vehicle?.reminderLeadDays ?? 30,
+    notes: vehicle?.notes ?? ''
+  });
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (vehicle) {
+        await api.put(`/vehicles/${vehicle.id}`, data);
+      } else {
+        await api.post('/vehicles', data);
+      }
+      toast.success(vehicle ? 'Vehicle updated' : 'Vehicle added');
+      onSaved();
+    } catch (err) {
+      toast.error(String(err));
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="space-y-4">
+      <div className="flex items-center gap-3">
+        <button type="button" onClick={onBack} className="p-2 rounded-full hover:bg-white/5">
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <h2 className="text-xl font-bold">{vehicle ? 'Edit vehicle' : 'New vehicle'}</h2>
+      </div>
+
+      <Input label="Display name" value={data.displayName} onChange={(v) => setData({ ...data, displayName: v })} />
+      <div className="grid grid-cols-2 gap-3">
+        <Input label="Year" type="number" value={data.year} onChange={(v) => setData({ ...data, year: Number(v) })} />
+        <Input label="Make" value={data.make} onChange={(v) => setData({ ...data, make: v })} />
+        <Input label="Model" value={data.model} onChange={(v) => setData({ ...data, model: v })} />
+        <Input label="Engine" value={data.engine} onChange={(v) => setData({ ...data, engine: v })} />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Input label="VIN" value={data.vin} onChange={(v) => setData({ ...data, vin: v })} />
+        <Input label="License plate" value={data.licensePlate} onChange={(v) => setData({ ...data, licensePlate: v })} />
+      </div>
+      <Input
+        label="Current mileage"
+        type="number"
+        value={data.currentMileage}
+        onChange={(v) => setData({ ...data, currentMileage: Number(v) })}
+      />
+
+      <div className="space-y-3 pt-4 border-t border-white/5">
+        <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wider">Oil preferences</h3>
+        <div className="grid grid-cols-2 gap-3">
+          <Input label="Brand" value={data.oilBrandPref} onChange={(v) => setData({ ...data, oilBrandPref: v })} />
+          <Input label="Viscosity" value={data.oilViscosity} onChange={(v) => setData({ ...data, oilViscosity: v })} />
+        </div>
+        <Input label="Filter part number" value={data.filterPartNumber} onChange={(v) => setData({ ...data, filterPartNumber: v })} />
+      </div>
+
+      <div className="space-y-3 pt-4 border-t border-white/5">
+        <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wider">Intervals</h3>
+        <div className="grid grid-cols-2 gap-3">
+          <Input label="Miles" type="number" value={data.intervalMiles} onChange={(v) => setData({ ...data, intervalMiles: Number(v) })} />
+          <Input label="Months" type="number" value={data.intervalMonths} onChange={(v) => setData({ ...data, intervalMonths: Number(v) })} />
+          <Input label="Lead miles" type="number" value={data.reminderLeadMiles} onChange={(v) => setData({ ...data, reminderLeadMiles: Number(v) })} />
+          <Input label="Lead days" type="number" value={data.reminderLeadDays} onChange={(v) => setData({ ...data, reminderLeadDays: Number(v) })} />
+        </div>
+      </div>
+
+      <Input label="Notes" rows={3} value={data.notes} onChange={(v) => setData({ ...data, notes: v })} />
+
+      <Button type="submit" className="w-full gap-2">
+        <Save className="w-4 h-4" /> Save vehicle
+      </Button>
+    </form>
+  );
+}
+
+function ServiceForm({
+  vehicle,
+  onBack,
+  onSaved
+}: {
+  vehicle: Vehicle;
+  onBack: () => void;
+  onSaved: () => void;
+}) {
+  const [data, setData] = useState({
+    serviceDate: new Date().toISOString().split('T')[0],
+    mileage: vehicle.currentMileage ?? 0,
+    oilBrand: '',
+    oilProduct: '',
+    oilViscosity: vehicle.oilViscosity ?? '',
+    oilQuantity: 5,
+    filterBrand: '',
+    filterModel: vehicle.filterPartNumber ?? '',
+    performedBy: 'self',
+    cost: '',
+    notes: ''
+  });
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await api.post('/services', {
+        ...data,
+        vehicleId: vehicle.id,
+        serviceDate: new Date(data.serviceDate).toISOString(),
+        cost: data.cost ? Number(data.cost) : undefined,
+        oilQuantity: Number(data.oilQuantity),
+        mileage: Number(data.mileage)
+      });
+      toast.success('Service logged');
+      onSaved();
+    } catch (err) {
+      toast.error(String(err));
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="space-y-4">
+      <div className="flex items-center gap-3">
+        <button type="button" onClick={onBack} className="p-2 rounded-full hover:bg-white/5">
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <h2 className="text-xl font-bold">Add service</h2>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Input
+          label="Date"
+          type="date"
+          value={data.serviceDate}
+          onChange={(v) => setData({ ...data, serviceDate: v })}
+        />
+        <Input
+          label="Mileage"
+          type="number"
+          value={data.mileage}
+          onChange={(v) => setData({ ...data, mileage: Number(v) })}
+        />
+      </div>
+
+      <div className="space-y-3 pt-2 border-t border-white/5">
+        <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wider">Oil</h3>
+        <div className="grid grid-cols-2 gap-3">
+          <Input label="Brand" value={data.oilBrand} onChange={(v) => setData({ ...data, oilBrand: v })} />
+          <Input label="Product" value={data.oilProduct} onChange={(v) => setData({ ...data, oilProduct: v })} />
+          <Input label="Viscosity" value={data.oilViscosity} onChange={(v) => setData({ ...data, oilViscosity: v })} />
+          <Input label="Quantity" type="number" step="0.1" value={data.oilQuantity} onChange={(v) => setData({ ...data, oilQuantity: Number(v) })} />
+        </div>
+      </div>
+
+      <div className="space-y-3 pt-2 border-t border-white/5">
+        <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wider">Filter</h3>
+        <div className="grid grid-cols-2 gap-3">
+          <Input label="Brand" value={data.filterBrand} onChange={(v) => setData({ ...data, filterBrand: v })} />
+          <Input label="Model" value={data.filterModel} onChange={(v) => setData({ ...data, filterModel: v })} />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Input label="Performed by" value={data.performedBy} onChange={(v) => setData({ ...data, performedBy: v })} />
+        <Input label="Cost" type="number" step="0.01" value={data.cost} onChange={(v) => setData({ ...data, cost: v })} />
+      </div>
+
+      <Input label="Notes" rows={3} value={data.notes} onChange={(v) => setData({ ...data, notes: v })} />
+
+      <Button type="submit" className="w-full gap-2">
+        <Save className="w-4 h-4" /> Log service
+      </Button>
+    </form>
+  );
+}

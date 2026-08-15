@@ -1,0 +1,116 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Vehicle {
+  id            String    @id @default(uuid())
+  displayName   String
+  vin           String?
+  year          Int?
+  make          String?
+  model         String?
+  trim          String?
+  engine        String?
+  currentMileage Int?
+  licensePlate  String?
+  color         String?
+  notes         String?
+
+  oilType          String?
+  oilViscosity     String?
+  oilBrandPref     String?
+  oilCapacity      Float?
+  filterPartNumber String?
+  filterBrandPref  String?
+  intervalMiles    Int?    @default(5000)
+  intervalMonths   Int?    @default(6)
+  reminderLeadMiles Int?   @default(500)
+  reminderLeadDays  Int?   @default(30)
+
+  coverPhoto String?
+  photos     String? // JSON
+  tags       String? // JSON
+  archived   Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  services ServiceRecord[]
+}
+
+model ServiceRecord {
+  id          String   @id @default(uuid())
+  vehicleId   String
+  vehicle     Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  serviceDate DateTime
+  mileage     Int
+
+  oilBrand     String?
+  oilProduct   String?
+  oilViscosity String?
+  oilQuantity  Float?
+
+  filterBrand String?
+  filterModel String?
+
+  performedBy String?
+  cost        Float?
+  notes       String?
+
+  nextDueMileage Int?
+  nextDueDate    DateTime?
+
+  receipts String? // JSON filenames
+  photos   String? // JSON filenames
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model InventoryItem {
+  id            String  @id @default(uuid())
+  name          String
+  category      String  @default("other")
+  brand         String?
+  partNumber    String?
+  barcode       String?
+  quantity      Float   @default(0)
+  unitType      String  @default("each")
+  lowStockThreshold Float @default(1)
+  costPerUnit   Float?
+  storageLocation String?
+  notes         String?
+  photoFilename String?
+  archived      Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Receipt {
+  id           String   @id @default(uuid())
+  filename     String
+  originalName String
+  ocrText      String?
+  merchantName String?
+  receiptDate  DateTime?
+  total        Float?
+  tax          Float?
+  lineItems    String? // JSON
+  confirmed    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+}
+
+model Setting {
+  id                     String  @id @default("default")
+  defaultIntervalMiles   Int?    @default(5000)
+  defaultIntervalMonths  Int?    @default(6)
+  defaultReminderLeadMiles Int?  @default(500)
+  defaultReminderLeadDays  Int?  @default(30)
+  theme                  String  @default("dark")
+}

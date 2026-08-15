@@ -1,0 +1,116 @@
+import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
+import toast from 'react-hot-toast';
+import { Settings, Save, Download } from 'lucide-react';
+import { api } from './api';
+import { Button, Input, Card } from './Ui';
+import type { Settings as AppSettings } from './types';
+
+interface SettingsViewProps {
+  settings: AppSettings | null;
+  onRefresh: () => void;
+}
+
+export function SettingsView({ settings, onRefresh }: SettingsViewProps) {
+  const [data, setData] = useState({
+    defaultIntervalMiles: 5000,
+    defaultIntervalMonths: 6,
+    defaultReminderLeadMiles: 500,
+    defaultReminderLeadDays: 30
+  });
+
+  useEffect(() => {
+    if (settings) {
+      setData({
+        defaultIntervalMiles: settings.defaultIntervalMiles ?? 5000,
+        defaultIntervalMonths: settings.defaultIntervalMonths ?? 6,
+        defaultReminderLeadMiles: settings.defaultReminderLeadMiles ?? 500,
+        defaultReminderLeadDays: settings.defaultReminderLeadDays ?? 30
+      });
+    }
+  }, [settings]);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await api.put('/settings', {
+        defaultIntervalMiles: Number(data.defaultIntervalMiles),
+        defaultIntervalMonths: Number(data.defaultIntervalMonths),
+        defaultReminderLeadMiles: Number(data.defaultReminderLeadMiles),
+        defaultReminderLeadDays: Number(data.defaultReminderLeadDays)
+      });
+      toast.success('Settings saved');
+      onRefresh();
+    } catch (err) {
+      toast.error(String(err));
+    }
+  };
+
+  const backup = () => {
+    window.open('/api/backups/export', '_blank');
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -20 }}
+      className="pb-24 space-y-6"
+    >
+      <h2 className="text-2xl font-bold flex items-center gap-2">
+        <Settings className="w-6 h-6 text-accent-300" /> Settings
+      </h2>
+
+      <form onSubmit={submit} className="space-y-4">
+        <Card className="p-4 space-y-4">
+          <h3 className="font-semibold text-slate-200">Default service intervals</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="Interval miles"
+              type="number"
+              value={data.defaultIntervalMiles}
+              onChange={(v) => setData({ ...data, defaultIntervalMiles: Number(v) })}
+            />
+            <Input
+              label="Interval months"
+              type="number"
+              value={data.defaultIntervalMonths}
+              onChange={(v) => setData({ ...data, defaultIntervalMonths: Number(v) })}
+            />
+            <Input
+              label="Lead miles"
+              type="number"
+              value={data.defaultReminderLeadMiles}
+              onChange={(v) => setData({ ...data, defaultReminderLeadMiles: Number(v) })}
+            />
+            <Input
+              label="Lead days"
+              type="number"
+              value={data.defaultReminderLeadDays}
+              onChange={(v) => setData({ ...data, defaultReminderLeadDays: Number(v) })}
+            />
+          </div>
+        </Card>
+
+        <Button type="submit" className="w-full gap-2">
+          <Save className="w-4 h-4" /> Save defaults
+        </Button>
+      </form>
+
+      <Card className="p-4 space-y-3">
+        <h3 className="font-semibold text-slate-200">Data</h3>
+        <p className="text-sm text-slate-400">
+          Download a full JSON backup of your vehicles, services, inventory, and settings.
+        </p>
+        <Button onClick={backup} variant="secondary" className="w-full gap-2">
+          <Download className="w-4 h-4" /> Export backup
+        </Button>
+      </Card>
+
+      <Card className="p-4 space-y-2 text-sm text-slate-400">
+        <h3 className="font-semibold text-slate-200">About Dipstick v2</h3>
+        <p>A fresh, modern oil-change and service tracker. Built from scratch with Vite, React, Tailwind, and SQLite.</p>
+      </Card>
+    </motion.div>
+  );
+}
