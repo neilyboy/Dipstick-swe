@@ -253,7 +253,7 @@ function VehicleDetail({
         )}
         <label className="absolute bottom-3 right-3 glass rounded-xl p-2 cursor-pointer hover:bg-white/10 transition">
           <Camera className="w-4 h-4" />
-          <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhoto} />
+          <input type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
         </label>
       </div>
 
@@ -545,7 +545,7 @@ function VehicleForm({
       {!vehicle && (
         <label className="block group cursor-pointer">
           <span className="text-xs font-medium text-slate-400 uppercase tracking-wider block mb-1.5">Cover photo</span>
-          <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFile} />
+          <input type="file" accept="image/*" className="hidden" onChange={handleFile} />
           <div className="relative h-40 rounded-2xl border border-dashed border-white/20 bg-base-900/40 flex flex-col items-center justify-center overflow-hidden hover:border-accent-500/50 transition">
             {previewUrl ? (
               <img src={previewUrl} alt="" className="w-full h-full object-cover" />
@@ -745,7 +745,7 @@ function ServiceForm({
         <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wider">Attachments</h3>
         <div className="grid grid-cols-2 gap-3">
           <label className="block group cursor-pointer">
-            <input type="file" accept="image/*" multiple capture="environment" className="hidden" onChange={handlePhotos} />
+            <input type="file" accept="image/*" multiple className="hidden" onChange={handlePhotos} />
             <div className="h-28 rounded-2xl border border-dashed border-white/20 bg-base-900/40 flex flex-col items-center justify-center gap-1 hover:border-accent-500/50 transition">
               <Camera className="w-6 h-6 text-slate-500" />
               <span className="text-sm text-slate-500">Photos (oil, filter)</span>
@@ -753,7 +753,7 @@ function ServiceForm({
             </div>
           </label>
           <label className="block group cursor-pointer">
-            <input type="file" accept="image/*" multiple capture="environment" className="hidden" onChange={handleReceipts} />
+            <input type="file" accept="image/*" multiple className="hidden" onChange={handleReceipts} />
             <div className="h-28 rounded-2xl border border-dashed border-white/20 bg-base-900/40 flex flex-col items-center justify-center gap-1 hover:border-accent-500/50 transition">
               <FileText className="w-6 h-6 text-slate-500" />
               <span className="text-sm text-slate-500">Receipts</span>
