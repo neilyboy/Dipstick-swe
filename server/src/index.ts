@@ -209,34 +209,51 @@ app.get('/api/services', async (req, res) => {
   );
 });
 
-app.post('/api/services', async (req, res) => {
-  const data = serviceSchema.parse(req.body);
-  const vehicle = await prisma.vehicle.findUnique({ where: { id: data.vehicleId } });
-  if (!vehicle) return res.status(404).json({ error: 'Vehicle not found' });
+app.post(
+  '/api/services',
+  upload.fields([
+    { name: 'photos', maxCount: 5 },
+    { name: 'receipts', maxCount: 5 }
+  ]),
+  async (req, res) => {
+    const data = serviceSchema.parse(req.body);
+    const files = (req as any).files as { photos?: Express.Multer.File[]; receipts?: Express.Multer.File[] } | undefined;
+    const photoNames = files?.photos?.map((f) => f.filename) ?? [];
+    const receiptNames = files?.receipts?.map((f) => f.filename) ?? [];
 
-  const nextDue = calculateNextDue(
-    { mileage: data.mileage, serviceDate: data.serviceDate },
-    vehicle
-  );
+    const vehicle = await prisma.vehicle.findUnique({ where: { id: data.vehicleId } });
+    if (!vehicle) return res.status(404).json({ error: 'Vehicle not found' });
 
-  const service = await prisma.$transaction(async (tx) => {
-    if (vehicle.currentMileage == null || data.mileage > vehicle.currentMileage) {
-      await tx.vehicle.update({
-        where: { id: data.vehicleId },
-        data: { currentMileage: data.mileage }
-      });
-    }
-    return tx.serviceRecord.create({
-      data: {
-        ...data,
-        nextDueMileage: data.nextDueMileage ?? nextDue.nextMiles,
-        nextDueDate: data.nextDueDate ?? nextDue.nextDate
+    const nextDue = calculateNextDue(
+      { mileage: data.mileage, serviceDate: data.serviceDate },
+      vehicle
+    );
+
+    const service = await prisma.$transaction(async (tx) => {
+      if (vehicle.currentMileage == null || data.mileage > vehicle.currentMileage) {
+        await tx.vehicle.update({
+          where: { id: data.vehicleId },
+          data: { currentMileage: data.mileage }
+        });
       }
+      return tx.serviceRecord.create({
+        data: {
+          ...data,
+          nextDueMileage: data.nextDueMileage ?? nextDue.nextMiles,
+          nextDueDate: data.nextDueDate ?? nextDue.nextDate,
+          photos: JSON.stringify(photoNames),
+          receipts: JSON.stringify(receiptNames)
+        }
+      });
     });
-  });
 
-  res.status(201).json(service);
-});
+    res.status(201).json({
+      ...service,
+      receipts: receiptNames,
+      photos: photoNames
+    });
+  }
+);
 
 app.put('/api/services/:id', async (req, res) => {
   const data = serviceSchema.partial().parse(req.body);
@@ -406,8 +423,16 @@ app.get('/api/exports/vehicle/:id/pdf', async (req, res) => {
     const photoPath = path.join(uploadDir, vehicle.coverPhoto);
     if (fs.existsSync(photoPath)) {
       try {
-        doc.image(photoPath, W - 170, 35, { fit: [120, 120], align: 'center', valign: 'center' });
-        doc.strokeColor('#38bdf8').lineWidth(2).rect(W - 172, 33, 124, 124).stroke();
+        const boxX = W - 170;
+        const boxY = 35;
+        const boxSize = 120;
+        const padding = 12;
+        doc.image(photoPath, boxX + padding, boxY + padding, {
+          fit: [boxSize - padding * 2, boxSize - padding * 2],
+          align: 'center',
+          valign: 'center'
+        });
+        doc.strokeColor('#38bdf8', 0.4).lineWidth(2).roundedRect(boxX, boxY, boxSize, boxSize, 8).stroke();
       } catch {
         // ignore bad/corrupt image
       }

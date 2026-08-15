@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import {
@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { api } from './api';
 import { Button, Input, Card, Badge } from './Ui';
-import type { Vehicle } from './types';
+import type { ServiceRecord, Vehicle } from './types';
 
 interface VehiclesViewProps {
   vehicles: Vehicle[];
@@ -311,6 +311,8 @@ function VehicleDetail({
         {vehicle.notes && <div className="text-sm text-slate-400 pt-2 border-t border-white/5">{vehicle.notes}</div>}
       </Card>
 
+      <ServiceHistory vehicleId={vehicle.id} />
+
       <div className="flex gap-3">
         <Button onClick={onEdit} variant="secondary" className="flex-1 gap-2">
           <SlidersHorizontal className="w-4 h-4" /> Edit
@@ -330,6 +332,81 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
       <span className="text-slate-500">{label}</span>
       <span className="text-slate-200">{value}</span>
     </div>
+  );
+}
+
+function ServiceHistory({ vehicleId }: { vehicleId: string }) {
+  const [services, setServices] = useState<ServiceRecord[]>([]);
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.get<ServiceRecord[]>(`/services?vehicleId=${vehicleId}`)
+      .then((res) => setServices(res.data))
+      .catch(() => setServices([]));
+  }, [vehicleId]);
+
+  if (services.length === 0) return null;
+
+  return (
+    <Card className="p-4 space-y-3">
+      <h3 className="font-semibold text-slate-200">Service history</h3>
+      <div className="space-y-2">
+        {services.map((s) => {
+          const isOpen = expanded === s.id;
+          return (
+            <div key={s.id} className="rounded-xl border border-white/10 bg-base-900/40 overflow-hidden">
+              <button
+                onClick={() => setExpanded(isOpen ? null : s.id)}
+                className="w-full flex items-center justify-between p-3 text-left hover:bg-white/5 transition"
+              >
+                <div>
+                  <div className="font-medium text-sm">
+                    {new Date(s.serviceDate).toLocaleDateString()} · {s.mileage.toLocaleString()} mi
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    {s.oilBrand ? `${s.oilBrand} ${s.oilViscosity}` : 'Service record'}
+                    {s.cost != null ? ` · $${s.cost.toFixed(2)}` : ''}
+                  </div>
+                </div>
+                <div className="text-xs text-slate-500">{isOpen ? '▾' : '▸'}</div>
+              </button>
+              {isOpen && (
+                <div className="p-3 pt-0 space-y-3 border-t border-white/5">
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <DetailRow label="Oil" value={`${s.oilBrand ?? ''} ${s.oilProduct ?? ''} ${s.oilViscosity ?? ''}`.trim()} />
+                    <DetailRow label="Filter" value={`${s.filterBrand ?? ''} ${s.filterModel ?? ''}`.trim()} />
+                    <DetailRow label="Qty" value={s.oilQuantity} />
+                    <DetailRow label="Performed by" value={s.performedBy} />
+                    <DetailRow label="Cost" value={s.cost != null ? `$${s.cost.toFixed(2)}` : undefined} />
+                    <DetailRow label="Notes" value={s.notes} />
+                  </div>
+                  {s.photos && s.photos.length > 0 && (
+                    <div>
+                      <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Photos</div>
+                      <div className="grid grid-cols-4 gap-2">
+                        {s.photos.map((p) => (
+                          <img key={p} src={`/uploads/${p}`} alt="" className="h-16 w-full object-cover rounded-lg" />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {s.receipts && s.receipts.length > 0 && (
+                    <div>
+                      <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Receipts</div>
+                      <div className="grid grid-cols-4 gap-2">
+                        {s.receipts.map((r) => (
+                          <img key={r} src={`/uploads/${r}`} alt="" className="h-16 w-full object-cover rounded-lg" />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </Card>
   );
 }
 
@@ -527,18 +604,36 @@ function ServiceForm({
     cost: '',
     notes: ''
   });
+  const [photoFiles, setPhotoFiles] = useState<File[]>([]);
+  const [receiptFiles, setReceiptFiles] = useState<File[]>([]);
+
+  const handlePhotos = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPhotoFiles(Array.from(e.target.files || []));
+  };
+
+  const handleReceipts = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setReceiptFiles(Array.from(e.target.files || []));
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await api.post('/services', {
-        ...data,
-        vehicleId: vehicle.id,
-        serviceDate: new Date(data.serviceDate).toISOString(),
-        cost: data.cost ? Number(data.cost) : undefined,
-        oilQuantity: Number(data.oilQuantity),
-        mileage: Number(data.mileage)
-      });
+      const form = new FormData();
+      form.append('vehicleId', vehicle.id);
+      form.append('serviceDate', new Date(data.serviceDate).toISOString());
+      form.append('mileage', String(data.mileage));
+      form.append('oilBrand', data.oilBrand);
+      form.append('oilProduct', data.oilProduct);
+      form.append('oilViscosity', data.oilViscosity);
+      form.append('oilQuantity', String(data.oilQuantity));
+      form.append('filterBrand', data.filterBrand);
+      form.append('filterModel', data.filterModel);
+      form.append('performedBy', data.performedBy);
+      form.append('cost', data.cost ? String(Number(data.cost)) : '');
+      form.append('notes', data.notes);
+      photoFiles.forEach((f) => form.append('photos', f));
+      receiptFiles.forEach((f) => form.append('receipts', f));
+      await api.post('/services', form);
       toast.success('Service logged');
       onSaved();
     } catch (err) {
@@ -594,6 +689,28 @@ function ServiceForm({
       </div>
 
       <Input label="Notes" rows={3} value={data.notes} onChange={(v) => setData({ ...data, notes: v })} />
+
+      <div className="space-y-3 pt-2 border-t border-white/5">
+        <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wider">Attachments</h3>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block group cursor-pointer">
+            <input type="file" accept="image/*" multiple className="hidden" onChange={handlePhotos} />
+            <div className="h-28 rounded-2xl border border-dashed border-white/20 bg-base-900/40 flex flex-col items-center justify-center gap-1 hover:border-accent-500/50 transition">
+              <Camera className="w-6 h-6 text-slate-500" />
+              <span className="text-sm text-slate-500">Photos (oil, filter)</span>
+              {photoFiles.length > 0 && <span className="text-xs text-accent-400">{photoFiles.length} selected</span>}
+            </div>
+          </label>
+          <label className="block group cursor-pointer">
+            <input type="file" accept="image/*" multiple className="hidden" onChange={handleReceipts} />
+            <div className="h-28 rounded-2xl border border-dashed border-white/20 bg-base-900/40 flex flex-col items-center justify-center gap-1 hover:border-accent-500/50 transition">
+              <FileText className="w-6 h-6 text-slate-500" />
+              <span className="text-sm text-slate-500">Receipts</span>
+              {receiptFiles.length > 0 && <span className="text-xs text-accent-400">{receiptFiles.length} selected</span>}
+            </div>
+          </label>
+        </div>
+      </div>
 
       <Button type="submit" className="w-full gap-2">
         <Save className="w-4 h-4" /> Log service
