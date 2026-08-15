@@ -41,8 +41,8 @@ A production-ready, mobile-first PWA for tracking vehicle oil changes, parts inv
 
 ```bash
 # Clone the repo
-git clone https://github.com/neilyboy/Dipstick-Oil-Tracker.git
-cd Dipstick-Oil-Tracker
+git clone https://github.com/neilyboy/Dipstick-swe.git
+cd Dipstick-swe
 
 # Install dependencies
 npm install
