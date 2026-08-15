@@ -3,7 +3,7 @@ services:
     build: .
     container_name: dipstick
     ports:
-      - "3001:3001"
+      - "3125:3001"
     environment:
       - NODE_ENV=production
       - PORT=3001

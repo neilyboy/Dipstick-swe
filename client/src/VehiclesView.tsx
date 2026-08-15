@@ -360,6 +360,41 @@ function VehicleForm({
     reminderLeadDays: vehicle?.reminderLeadDays ?? 30,
     notes: vehicle?.notes ?? ''
   });
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [vinLoading, setVinLoading] = useState(false);
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCoverFile(file);
+    setPreviewUrl(URL.createObjectURL(file));
+  };
+
+  const decodeVin = async () => {
+    const vin = data.vin?.trim() ?? '';
+    if (vin.length !== 17) {
+      toast.error('Enter a 17-character VIN');
+      return;
+    }
+    setVinLoading(true);
+    try {
+      const res = await api.get(`/vin/${vin}`);
+      const d = res.data as Partial<Vehicle>;
+      setData((prev) => ({
+        ...prev,
+        year: d.year ?? prev.year,
+        make: d.make ?? prev.make,
+        model: d.model ?? prev.model,
+        engine: d.engine ?? prev.engine
+      }));
+      toast.success('VIN decoded');
+    } catch (err) {
+      toast.error(String(err));
+    } finally {
+      setVinLoading(false);
+    }
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -367,7 +402,13 @@ function VehicleForm({
       if (vehicle) {
         await api.put(`/vehicles/${vehicle.id}`, data);
       } else {
-        await api.post('/vehicles', data);
+        const form = new FormData();
+        Object.entries(data).forEach(([key, val]) => {
+          if (val === undefined || val === null) return;
+          form.append(key, String(val));
+        });
+        if (coverFile) form.append('coverPhoto', coverFile);
+        await api.post('/vehicles', form);
       }
       toast.success(vehicle ? 'Vehicle updated' : 'Vehicle added');
       onSaved();
@@ -385,6 +426,23 @@ function VehicleForm({
         <h2 className="text-xl font-bold">{vehicle ? 'Edit vehicle' : 'New vehicle'}</h2>
       </div>
 
+      {!vehicle && (
+        <label className="block group cursor-pointer">
+          <span className="text-xs font-medium text-slate-400 uppercase tracking-wider block mb-1.5">Cover photo</span>
+          <input type="file" accept="image/*" className="hidden" onChange={handleFile} />
+          <div className="relative h-40 rounded-2xl border border-dashed border-white/20 bg-base-900/40 flex flex-col items-center justify-center overflow-hidden hover:border-accent-500/50 transition">
+            {previewUrl ? (
+              <img src={previewUrl} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <>
+                <Camera className="w-8 h-8 text-slate-500 mb-2" />
+                <span className="text-sm text-slate-500">Tap to take a photo or choose from gallery</span>
+              </>
+            )}
+          </div>
+        </label>
+      )}
+
       <Input label="Display name" value={data.displayName} onChange={(v) => setData({ ...data, displayName: v })} />
       <div className="grid grid-cols-2 gap-3">
         <Input label="Year" type="number" value={data.year} onChange={(v) => setData({ ...data, year: Number(v) })} />
@@ -392,16 +450,32 @@ function VehicleForm({
         <Input label="Model" value={data.model} onChange={(v) => setData({ ...data, model: v })} />
         <Input label="Engine" value={data.engine} onChange={(v) => setData({ ...data, engine: v })} />
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <Input label="VIN" value={data.vin} onChange={(v) => setData({ ...data, vin: v })} />
-        <Input label="License plate" value={data.licensePlate} onChange={(v) => setData({ ...data, licensePlate: v })} />
+      <div className="grid grid-cols-[1fr,auto] gap-3 items-end">
+        <Input
+          label="VIN"
+          value={data.vin}
+          onChange={(v) => setData({ ...data, vin: v.toUpperCase() })}
+          placeholder="1HGBH41JXMN109186"
+        />
+        <Button
+          type="button"
+          onClick={decodeVin}
+          disabled={vinLoading}
+          variant="secondary"
+          className="gap-2 h-[46px]"
+        >
+          <Search className="w-4 h-4" /> {vinLoading ? '...' : 'Lookup'}
+        </Button>
       </div>
-      <Input
-        label="Current mileage"
-        type="number"
-        value={data.currentMileage}
-        onChange={(v) => setData({ ...data, currentMileage: Number(v) })}
-      />
+      <div className="grid grid-cols-2 gap-3">
+        <Input label="License plate" value={data.licensePlate} onChange={(v) => setData({ ...data, licensePlate: v })} />
+        <Input
+          label="Current mileage"
+          type="number"
+          value={data.currentMileage}
+          onChange={(v) => setData({ ...data, currentMileage: Number(v) })}
+        />
+      </div>
 
       <div className="space-y-3 pt-4 border-t border-white/5">
         <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wider">Oil preferences</h3>

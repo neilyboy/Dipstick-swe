@@ -132,12 +132,13 @@ app.get('/api/vehicles', async (req, res) => {
   res.json(items);
 });
 
-app.post('/api/vehicles', async (req, res) => {
+app.post('/api/vehicles', upload.single('coverPhoto'), async (req, res) => {
   const data = vehicleSchema.parse(req.body);
   const settings = await prisma.setting.findFirst();
   const vehicle = await prisma.vehicle.create({
     data: {
       ...data,
+      coverPhoto: req.file?.filename,
       intervalMiles: data.intervalMiles ?? settings?.defaultIntervalMiles ?? 5000,
       intervalMonths: data.intervalMonths ?? settings?.defaultIntervalMonths ?? 6,
       reminderLeadMiles: data.reminderLeadMiles ?? settings?.defaultReminderLeadMiles ?? 500,
@@ -428,6 +429,34 @@ app.put('/api/settings', async (req, res) => {
     update: data
   });
   res.json(settings);
+});
+
+// ─── VIN DECODE ─────────────────────────────────────────────────────────────
+
+app.get('/api/vin/:vin', async (req, res) => {
+  const { vin } = req.params;
+  if (!/^[A-HJ-NPR-Z0-9]{17}$/i.test(vin)) {
+    return res.status(400).json({ error: 'Invalid VIN' });
+  }
+  try {
+    const url = `https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/${encodeURIComponent(vin)}?format=json`;
+    const response = await fetch(url);
+    const json = (await response.json()) as any;
+    const result = json?.Results?.[0];
+    if (!result) return res.status(404).json({ error: 'VIN not found' });
+
+    const year = result.ModelYear ? Number(result.ModelYear) : undefined;
+    const make = result.Make || undefined;
+    const model = result.Model || undefined;
+    const engine =
+      [result.DisplacementL && `${result.DisplacementL}L`, result.EngineCylinders && `${result.EngineCylinders}cyl`]
+        .filter(Boolean)
+        .join(' ') || undefined;
+
+    res.json({ year, make, model, engine, raw: result });
+  } catch (err) {
+    res.status(502).json({ error: 'VIN lookup failed', message: String(err) });
+  }
 });
 
 // ─── CLIENT SPA ──────────────────────────────────────────────────────────────
