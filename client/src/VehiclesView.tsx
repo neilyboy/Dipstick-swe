@@ -13,7 +13,8 @@ import {
   Trash,
   Camera,
   Search,
-  SlidersHorizontal
+  SlidersHorizontal,
+  X
 } from 'lucide-react';
 import { api } from './api';
 import { Button, Input, Card, Badge } from './Ui';
@@ -252,7 +253,7 @@ function VehicleDetail({
         )}
         <label className="absolute bottom-3 right-3 glass rounded-xl p-2 cursor-pointer hover:bg-white/10 transition">
           <Camera className="w-4 h-4" />
-          <input type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
+          <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhoto} />
         </label>
       </div>
 
@@ -335,9 +336,32 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
   );
 }
 
+function Lightbox({ src, onClose }: { src: string; onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <button
+        className="absolute top-4 right-4 p-2 rounded-full glass hover:bg-white/10 transition"
+        onClick={onClose}
+      >
+        <X className="w-5 h-5" />
+      </button>
+      <img
+        src={src}
+        alt=""
+        className="max-w-full max-h-full rounded-xl object-contain"
+        onClick={(e) => e.stopPropagation()}
+      />
+    </div>
+  );
+}
+
 function ServiceHistory({ vehicleId }: { vehicleId: string }) {
   const [services, setServices] = useState<ServiceRecord[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
   useEffect(() => {
     api.get<ServiceRecord[]>(`/services?vehicleId=${vehicleId}`)
@@ -348,65 +372,80 @@ function ServiceHistory({ vehicleId }: { vehicleId: string }) {
   if (services.length === 0) return null;
 
   return (
-    <Card className="p-4 space-y-3">
-      <h3 className="font-semibold text-slate-200">Service history</h3>
-      <div className="space-y-2">
-        {services.map((s) => {
-          const isOpen = expanded === s.id;
-          return (
-            <div key={s.id} className="rounded-xl border border-white/10 bg-base-900/40 overflow-hidden">
-              <button
-                onClick={() => setExpanded(isOpen ? null : s.id)}
-                className="w-full flex items-center justify-between p-3 text-left hover:bg-white/5 transition"
-              >
-                <div>
-                  <div className="font-medium text-sm">
-                    {new Date(s.serviceDate).toLocaleDateString()} · {s.mileage.toLocaleString()} mi
-                  </div>
-                  <div className="text-xs text-slate-500">
-                    {s.oilBrand ? `${s.oilBrand} ${s.oilViscosity}` : 'Service record'}
-                    {s.cost != null ? ` · $${s.cost.toFixed(2)}` : ''}
-                  </div>
-                </div>
-                <div className="text-xs text-slate-500">{isOpen ? '▾' : '▸'}</div>
-              </button>
-              {isOpen && (
-                <div className="p-3 pt-0 space-y-3 border-t border-white/5">
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <DetailRow label="Oil" value={`${s.oilBrand ?? ''} ${s.oilProduct ?? ''} ${s.oilViscosity ?? ''}`.trim()} />
-                    <DetailRow label="Filter" value={`${s.filterBrand ?? ''} ${s.filterModel ?? ''}`.trim()} />
-                    <DetailRow label="Qty" value={s.oilQuantity} />
-                    <DetailRow label="Performed by" value={s.performedBy} />
-                    <DetailRow label="Cost" value={s.cost != null ? `$${s.cost.toFixed(2)}` : undefined} />
-                    <DetailRow label="Notes" value={s.notes} />
-                  </div>
-                  {s.photos && s.photos.length > 0 && (
-                    <div>
-                      <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Photos</div>
-                      <div className="grid grid-cols-4 gap-2">
-                        {s.photos.map((p) => (
-                          <img key={p} src={`/uploads/${p}`} alt="" className="h-16 w-full object-cover rounded-lg" />
-                        ))}
-                      </div>
+    <>
+      {lightboxSrc && <Lightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />}
+      <Card className="p-4 space-y-3">
+        <h3 className="font-semibold text-slate-200">Service history</h3>
+        <div className="space-y-2">
+          {services.map((s) => {
+            const isOpen = expanded === s.id;
+            return (
+              <div key={s.id} className="rounded-xl border border-white/10 bg-base-900/40 overflow-hidden">
+                <button
+                  onClick={() => setExpanded(isOpen ? null : s.id)}
+                  className="w-full flex items-center justify-between p-3 text-left hover:bg-white/5 transition"
+                >
+                  <div>
+                    <div className="font-medium text-sm">
+                      {new Date(s.serviceDate).toLocaleDateString()} · {s.mileage.toLocaleString()} mi
                     </div>
-                  )}
-                  {s.receipts && s.receipts.length > 0 && (
-                    <div>
-                      <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Receipts</div>
-                      <div className="grid grid-cols-4 gap-2">
-                        {s.receipts.map((r) => (
-                          <img key={r} src={`/uploads/${r}`} alt="" className="h-16 w-full object-cover rounded-lg" />
-                        ))}
-                      </div>
+                    <div className="text-xs text-slate-500">
+                      {s.oilBrand ? `${s.oilBrand} ${s.oilViscosity}` : 'Service record'}
+                      {s.cost != null ? ` · $${s.cost.toFixed(2)}` : ''}
                     </div>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </Card>
+                  </div>
+                  <div className="text-xs text-slate-500">{isOpen ? '▾' : '▸'}</div>
+                </button>
+                {isOpen && (
+                  <div className="p-3 pt-0 space-y-3 border-t border-white/5">
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <DetailRow label="Oil" value={`${s.oilBrand ?? ''} ${s.oilProduct ?? ''} ${s.oilViscosity ?? ''}`.trim()} />
+                      <DetailRow label="Filter" value={`${s.filterBrand ?? ''} ${s.filterModel ?? ''}`.trim()} />
+                      <DetailRow label="Qty" value={s.oilQuantity} />
+                      <DetailRow label="Performed by" value={s.performedBy} />
+                      <DetailRow label="Cost" value={s.cost != null ? `$${s.cost.toFixed(2)}` : undefined} />
+                      <DetailRow label="Notes" value={s.notes} />
+                    </div>
+                    {s.photos && s.photos.length > 0 && (
+                      <div>
+                        <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Photos</div>
+                        <div className="grid grid-cols-4 gap-2">
+                          {s.photos.map((p) => (
+                            <img
+                              key={p}
+                              src={`/uploads/${p}`}
+                              alt=""
+                              className="h-16 w-full object-cover rounded-lg cursor-pointer hover:opacity-80 transition"
+                              onClick={() => setLightboxSrc(`/uploads/${p}`)}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {s.receipts && s.receipts.length > 0 && (
+                      <div>
+                        <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Receipts</div>
+                        <div className="grid grid-cols-4 gap-2">
+                          {s.receipts.map((r) => (
+                            <img
+                              key={r}
+                              src={`/uploads/${r}`}
+                              alt=""
+                              className="h-16 w-full object-cover rounded-lg cursor-pointer hover:opacity-80 transition"
+                              onClick={() => setLightboxSrc(`/uploads/${r}`)}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+    </>
   );
 }
 
@@ -506,7 +545,7 @@ function VehicleForm({
       {!vehicle && (
         <label className="block group cursor-pointer">
           <span className="text-xs font-medium text-slate-400 uppercase tracking-wider block mb-1.5">Cover photo</span>
-          <input type="file" accept="image/*" className="hidden" onChange={handleFile} />
+          <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFile} />
           <div className="relative h-40 rounded-2xl border border-dashed border-white/20 bg-base-900/40 flex flex-col items-center justify-center overflow-hidden hover:border-accent-500/50 transition">
             {previewUrl ? (
               <img src={previewUrl} alt="" className="w-full h-full object-cover" />
@@ -620,11 +659,11 @@ function ServiceForm({
   const [receiptFiles, setReceiptFiles] = useState<File[]>([]);
 
   const handlePhotos = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setPhotoFiles(Array.from(e.target.files || []));
+    setPhotoFiles((prev) => [...prev, ...Array.from(e.target.files || [])]);
   };
 
   const handleReceipts = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setReceiptFiles(Array.from(e.target.files || []));
+    setReceiptFiles((prev) => [...prev, ...Array.from(e.target.files || [])]);
   };
 
   const submit = async (e: React.FormEvent) => {
@@ -706,7 +745,7 @@ function ServiceForm({
         <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wider">Attachments</h3>
         <div className="grid grid-cols-2 gap-3">
           <label className="block group cursor-pointer">
-            <input type="file" accept="image/*" multiple className="hidden" onChange={handlePhotos} />
+            <input type="file" accept="image/*" multiple capture="environment" className="hidden" onChange={handlePhotos} />
             <div className="h-28 rounded-2xl border border-dashed border-white/20 bg-base-900/40 flex flex-col items-center justify-center gap-1 hover:border-accent-500/50 transition">
               <Camera className="w-6 h-6 text-slate-500" />
               <span className="text-sm text-slate-500">Photos (oil, filter)</span>
@@ -714,7 +753,7 @@ function ServiceForm({
             </div>
           </label>
           <label className="block group cursor-pointer">
-            <input type="file" accept="image/*" multiple className="hidden" onChange={handleReceipts} />
+            <input type="file" accept="image/*" multiple capture="environment" className="hidden" onChange={handleReceipts} />
             <div className="h-28 rounded-2xl border border-dashed border-white/20 bg-base-900/40 flex flex-col items-center justify-center gap-1 hover:border-accent-500/50 transition">
               <FileText className="w-6 h-6 text-slate-500" />
               <span className="text-sm text-slate-500">Receipts</span>

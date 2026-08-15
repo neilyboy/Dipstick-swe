@@ -400,33 +400,35 @@ app.get('/api/exports/vehicle/:id/pdf', async (req, res) => {
   const H = doc.page.height;
 
   // ─── HEADER ────────────────────────────────────────────────────────────────
-  const grad = doc.linearGradient(0, 0, W, 190).stop(0, '#0B0F19').stop(1, '#1e293b');
-  doc.rect(0, 0, W, 190).fill(grad);
+  const headerH = 130;
+  const grad = doc.linearGradient(0, 0, W, headerH).stop(0, '#0B0F19').stop(1, '#1e293b');
+  doc.rect(0, 0, W, headerH).fill(grad);
 
-  doc.font('Helvetica-Bold').fontSize(8).fillColor('#94a3b8').text('Dipstick Service History', 50, 25);
+  doc.font('Helvetica-Bold').fontSize(8).fillColor('#94a3b8').text('Dipstick Service History', 50, 15);
 
   const title = `${vehicle.displayName}`;
   const subtitle = `${vehicle.year ?? ''} ${vehicle.make ?? ''} ${vehicle.model ?? ''}`.trim() || 'Vehicle profile';
 
-  doc.font('Helvetica-Bold').fontSize(28).fillColor('#ffffff').text(title, 50, 60);
-  doc.font('Helvetica').fontSize(13).fillColor('#cbd5e1').text(subtitle, 50, 98);
-  doc.strokeColor('#38bdf8').lineWidth(3).moveTo(50, 122).lineTo(240, 122).stroke();
+  doc.font('Helvetica-Bold').fontSize(22).fillColor('#ffffff').text(title, 50, 35);
+  doc.font('Helvetica').fontSize(11).fillColor('#cbd5e1').text(subtitle, 50, 65);
+  doc.strokeColor('#38bdf8').lineWidth(2).moveTo(50, 82).lineTo(200, 82).stroke();
 
+  const metaY = 90;
   if (vehicle.vin) {
-    doc.font('Helvetica').fontSize(10).fillColor('#94a3b8').text(`VIN: ${vehicle.vin}`, 50, 135);
+    doc.font('Helvetica').fontSize(9).fillColor('#94a3b8').text(`VIN: ${vehicle.vin}`, 50, metaY);
   }
   if (vehicle.currentMileage != null) {
-    doc.font('Helvetica').fontSize(10).fillColor('#94a3b8').text(`Current mileage: ${vehicle.currentMileage.toLocaleString()} mi`, 50, 152);
+    doc.font('Helvetica').fontSize(9).fillColor('#94a3b8').text(`Mileage: ${vehicle.currentMileage.toLocaleString()} mi`, 50, metaY + 14);
   }
 
   if (vehicle.coverPhoto) {
     const photoPath = path.join(uploadDir, vehicle.coverPhoto);
     if (fs.existsSync(photoPath)) {
       try {
-        const maxW = 120;
-        const maxH = 120;
+        const maxW = 90;
+        const maxH = 90;
         const imgX = W - 50 - maxW;
-        const imgY = 35;
+        const imgY = 20;
         const r = 6;
 
         // Read image dimensions from file header
@@ -474,8 +476,8 @@ app.get('/api/exports/vehicle/:id/pdf', async (req, res) => {
   }
 
   // ─── VEHICLE INFO CARD ─────────────────────────────────────────────────────
-  let y = 220;
-  doc.fillColor('#f8fafc').strokeColor('#e2e8f0').lineWidth(1).roundedRect(40, y, W - 80, 120, 8).fillAndStroke();
+  let y = 155;
+  doc.fillColor('#f8fafc').strokeColor('#e2e8f0').lineWidth(1).roundedRect(40, y, W - 80, 100, 8).fillAndStroke();
 
   const info: { label: string; value: string }[] = [
     { label: 'Year', value: vehicle.year ? String(vehicle.year) : '-' },
@@ -499,7 +501,7 @@ app.get('/api/exports/vehicle/:id/pdf', async (req, res) => {
   });
 
   // ─── VIN-DERIVED DETAILS ───────────────────────────────────────────────────
-  y = 360;
+  y = 285;
   if (vinDetails) {
     doc.font('Helvetica-Bold').fontSize(15).fillColor('#0f172a').text('Vehicle details from VIN', 40, y);
     doc.strokeColor('#38bdf8').lineWidth(2).moveTo(40, y + 18).lineTo(250, y + 18).stroke();
@@ -525,7 +527,7 @@ app.get('/api/exports/vehicle/:id/pdf', async (req, res) => {
       doc.font('Helvetica-Bold').fontSize(7).fillColor('#64748b').text(item.label.toUpperCase(), x, ry);
       doc.font('Helvetica').fontSize(9).fillColor('#0f172a').text(item.value, x, ry + 11, { width: 110 });
     });
-    y += 120;
+    y += 110;
   }
 
   // ─── SERVICE HISTORY TABLE ─────────────────────────────────────────────────
