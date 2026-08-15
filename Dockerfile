@@ -8,6 +8,7 @@ RUN npm run build
 
 # Server build
 FROM node:20-slim AS server-builder
+RUN apt-get update && apt-get install -y openssl libssl3 ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /app/server
 COPY server/package.json server/package-lock.json* ./
 RUN npm ci
@@ -18,6 +19,7 @@ RUN npm run build
 
 # Production
 FROM node:20-slim
+RUN apt-get update && apt-get install -y openssl libssl3 ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=server-builder /app/server/node_modules ./server/node_modules
 COPY --from=server-builder /app/server/dist ./server/dist
