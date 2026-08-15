@@ -423,16 +423,50 @@ app.get('/api/exports/vehicle/:id/pdf', async (req, res) => {
     const photoPath = path.join(uploadDir, vehicle.coverPhoto);
     if (fs.existsSync(photoPath)) {
       try {
-        const boxX = W - 170;
-        const boxY = 35;
-        const boxSize = 120;
-        const padding = 12;
-        doc.image(photoPath, boxX + padding, boxY + padding, {
-          fit: [boxSize - padding * 2, boxSize - padding * 2],
-          align: 'center',
-          valign: 'center'
-        });
-        doc.strokeColor('#38bdf8', 0.4).lineWidth(2).roundedRect(boxX, boxY, boxSize, boxSize, 8).stroke();
+        const maxW = 120;
+        const maxH = 120;
+        const imgX = W - 50 - maxW;
+        const imgY = 35;
+        const r = 6;
+
+        // Read image dimensions from file header
+        const buf = fs.readFileSync(photoPath);
+        let natW = 0, natH = 0;
+        if (buf[0] === 0x89 && buf[1] === 0x50) {
+          // PNG: width at bytes 16-19, height at 20-23 (big-endian)
+          natW = buf.readUInt32BE(16);
+          natH = buf.readUInt32BE(20);
+        } else if (buf[0] === 0xff && buf[1] === 0xd8) {
+          // JPEG: scan for SOF0/SOF2 marker
+          let off = 2;
+          while (off < buf.length - 1) {
+            if (buf[off] !== 0xff) { off++; continue; }
+            const marker = buf[off + 1];
+            if (marker === 0xc0 || marker === 0xc2) {
+              natH = buf.readUInt16BE(off + 5);
+              natW = buf.readUInt16BE(off + 7);
+              break;
+            }
+            off += 2 + buf.readUInt16BE(off + 2);
+          }
+        }
+
+        if (natW > 0 && natH > 0) {
+          // Calculate fitted dimensions preserving aspect ratio
+          const scale = Math.min(maxW / natW, maxH / natH);
+          const fitW = natW * scale;
+          const fitH = natH * scale;
+
+          // Clip to rounded rect, draw image, then stroke border
+          doc.save();
+          doc.roundedRect(imgX, imgY, fitW, fitH, r).clip();
+          doc.image(photoPath, imgX, imgY, { width: fitW, height: fitH });
+          doc.restore();
+
+          doc.strokeColor('#38bdf8').lineWidth(1.5).opacity(0.5)
+            .roundedRect(imgX, imgY, fitW, fitH, r).stroke();
+          doc.opacity(1);
+        }
       } catch {
         // ignore bad/corrupt image
       }
