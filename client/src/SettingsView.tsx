@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
-import { Settings, Save, Download } from 'lucide-react';
+import { Settings, Save, Download, Upload, AlertTriangle } from 'lucide-react';
 import { api } from './api';
 import { Button, Input, Card } from './Ui';
 import type { Settings as AppSettings } from './types';
@@ -55,6 +55,30 @@ export function SettingsView({ settings, onRefresh }: SettingsViewProps) {
     window.open('/api/backups/export', '_blank');
   };
 
+  const [importing, setImporting] = useState(false);
+
+  const importBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!confirm('This will replace ALL current data. Continue?')) {
+      e.target.value = '';
+      return;
+    }
+    setImporting(true);
+    try {
+      const form = new FormData();
+      form.append('backup', file);
+      await api.post('/backups/import', form);
+      toast.success('Backup restored');
+      onRefresh();
+    } catch (err) {
+      toast.error(String(err));
+    } finally {
+      setImporting(false);
+      e.target.value = '';
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
@@ -103,13 +127,34 @@ export function SettingsView({ settings, onRefresh }: SettingsViewProps) {
       </form>
 
       <Card className="p-4 space-y-3">
-        <h3 className="font-semibold text-slate-200">Data</h3>
+        <h3 className="font-semibold text-slate-200">Data backup & restore</h3>
         <p className="text-sm text-slate-400">
-          Download a full JSON backup of your vehicles, services, inventory, and settings.
+          Export a full backup including all vehicles, services, inventory, receipts, settings, and uploaded images as a zip file.
         </p>
         <Button onClick={backup} variant="secondary" className="w-full gap-2">
-          <Download className="w-4 h-4" /> Export backup
+          <Download className="w-4 h-4" /> Export full backup
         </Button>
+        <div className="pt-2 border-t border-white/5 space-y-2">
+          <p className="text-sm text-slate-400">
+            Restore from a previously exported backup file. This will replace all current data.
+          </p>
+          <label className="block group cursor-pointer">
+            <input type="file" accept=".zip,application/zip" className="hidden" onChange={importBackup} />
+            <div className="w-full flex items-center justify-center gap-2 rounded-xl border border-dashed border-white/20 bg-base-900/40 px-4 py-3 text-sm text-slate-400 hover:border-accent-500/50 transition">
+              {importing ? (
+                <span className="text-accent-400">Restoring...</span>
+              ) : (
+                <>
+                  <Upload className="w-4 h-4" /> Import backup
+                </>
+              )}
+            </div>
+          </label>
+          <div className="flex items-start gap-2 text-xs text-amber-400/80">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+            <span>Importing will overwrite all existing data. Make sure you have a current backup first.</span>
+          </div>
+        </div>
       </Card>
 
       <Card className="p-4 space-y-2 text-sm text-slate-400">

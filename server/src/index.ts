@@ -3,6 +3,8 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
+import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
 import { PrismaClient } from '@prisma/client';
@@ -578,8 +580,100 @@ app.get('/api/backups/export', async (_req, res) => {
     prisma.receipt.findMany(),
     prisma.setting.findMany()
   ]);
-  res.setHeader('Content-Disposition', 'attachment; filename="dipstick-backup.json"');
-  res.json({ vehicles, services, inventory, receipts, settings, exportedAt: new Date() });
+
+  const data = { vehicles, services, inventory, receipts, settings, exportedAt: new Date() };
+  const tmpDir = path.join(os.tmpdir(), 'dipstick-backup-' + uuid());
+  fs.mkdirSync(tmpDir, { recursive: true });
+
+  // Write JSON data
+  fs.writeFileSync(path.join(tmpDir, 'backup.json'), JSON.stringify(data, null, 2));
+
+  // Copy uploads directory
+  const uploadsCopy = path.join(tmpDir, 'uploads');
+  if (fs.existsSync(uploadDir)) {
+    execSync(`cp -r "${uploadDir}" "${uploadsCopy}"`);
+  } else {
+    fs.mkdirSync(uploadsCopy, { recursive: true });
+  }
+
+  // Create zip
+  const zipPath = path.join(tmpDir, 'dipstick-backup.zip');
+  execSync(`cd "${tmpDir}" && zip -r "${zipPath}" .`);
+
+  // Send and cleanup
+  const zipBuf = fs.readFileSync(zipPath);
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+
+  res.setHeader('Content-Type', 'application/zip');
+  res.setHeader('Content-Disposition', 'attachment; filename="dipstick-backup.zip"');
+  res.send(zipBuf);
+});
+
+app.post('/api/backups/import', upload.single('backup'), async (req, res) => {
+  const file = (req as any).file as Express.Multer.File | undefined;
+  if (!file) return res.status(400).json({ error: 'No file uploaded' });
+
+  const tmpDir = path.join(os.tmpdir(), 'dipstick-restore-' + uuid());
+  try {
+    fs.mkdirSync(tmpDir, { recursive: true });
+    execSync(`unzip -o "${file.path}" -d "${tmpDir}"`);
+
+    const jsonPath = path.join(tmpDir, 'backup.json');
+    if (!fs.existsSync(jsonPath)) {
+      return res.status(400).json({ error: 'Invalid backup file: no backup.json found' });
+    }
+
+    const data = JSON.parse(fs.readFileSync(jsonPath, 'utf-8'));
+
+    // Restore uploads
+    const uploadsSrc = path.join(tmpDir, 'uploads');
+    if (fs.existsSync(uploadsSrc)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+      execSync(`cp -rf "${uploadsSrc}/"* "${uploadDir}/" 2>/dev/null || true`);
+    }
+
+    // Wipe and restore database
+    await prisma.$transaction([
+      prisma.serviceRecord.deleteMany(),
+      prisma.vehicle.deleteMany(),
+      prisma.inventoryItem.deleteMany(),
+      prisma.receipt.deleteMany(),
+      prisma.setting.deleteMany()
+    ]);
+
+    if (data.settings) {
+      for (const s of data.settings) {
+        await prisma.setting.upsert({ where: { id: s.id }, create: s, update: s });
+      }
+    }
+    if (data.vehicles) {
+      for (const v of data.vehicles) {
+        await prisma.vehicle.create({ data: v });
+      }
+    }
+    if (data.services) {
+      for (const s of data.services) {
+        await prisma.serviceRecord.create({ data: s });
+      }
+    }
+    if (data.inventory) {
+      for (const i of data.inventory) {
+        await prisma.inventoryItem.create({ data: i });
+      }
+    }
+    if (data.receipts) {
+      for (const r of data.receipts) {
+        await prisma.receipt.create({ data: r });
+      }
+    }
+
+    res.json({ success: true, message: 'Backup restored successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Import failed', message: String(err) });
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.rmSync(file.path, { force: true });
+  }
 });
 
 // ─── SETTINGS ─────────────────────────────────────────────────────────────────
