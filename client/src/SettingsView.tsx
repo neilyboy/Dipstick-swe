@@ -12,7 +12,12 @@ interface SettingsViewProps {
 }
 
 export function SettingsView({ settings, onRefresh }: SettingsViewProps) {
-  const [data, setData] = useState({
+  const [data, setData] = useState<{
+    defaultIntervalMiles?: number;
+    defaultIntervalMonths?: number;
+    defaultReminderLeadMiles?: number;
+    defaultReminderLeadDays?: number;
+  }>({
     defaultIntervalMiles: 5000,
     defaultIntervalMonths: 6,
     defaultReminderLeadMiles: 500,
@@ -34,10 +39,10 @@ export function SettingsView({ settings, onRefresh }: SettingsViewProps) {
     e.preventDefault();
     try {
       await api.put('/settings', {
-        defaultIntervalMiles: Number(data.defaultIntervalMiles),
-        defaultIntervalMonths: Number(data.defaultIntervalMonths),
-        defaultReminderLeadMiles: Number(data.defaultReminderLeadMiles),
-        defaultReminderLeadDays: Number(data.defaultReminderLeadDays)
+        defaultIntervalMiles: Number(data.defaultIntervalMiles) || 5000,
+        defaultIntervalMonths: Number(data.defaultIntervalMonths) || 6,
+        defaultReminderLeadMiles: Number(data.defaultReminderLeadMiles) || 500,
+        defaultReminderLeadDays: Number(data.defaultReminderLeadDays) || 30
       });
       toast.success('Settings saved');
       onRefresh();
@@ -69,25 +74,25 @@ export function SettingsView({ settings, onRefresh }: SettingsViewProps) {
               label="Interval miles"
               type="number"
               value={data.defaultIntervalMiles}
-              onChange={(v) => setData({ ...data, defaultIntervalMiles: Number(v) })}
+              onChange={(v) => setData({ ...data, defaultIntervalMiles: v === '' ? undefined : Number(v) })}
             />
             <Input
               label="Interval months"
               type="number"
               value={data.defaultIntervalMonths}
-              onChange={(v) => setData({ ...data, defaultIntervalMonths: Number(v) })}
+              onChange={(v) => setData({ ...data, defaultIntervalMonths: v === '' ? undefined : Number(v) })}
             />
             <Input
               label="Lead miles"
               type="number"
               value={data.defaultReminderLeadMiles}
-              onChange={(v) => setData({ ...data, defaultReminderLeadMiles: Number(v) })}
+              onChange={(v) => setData({ ...data, defaultReminderLeadMiles: v === '' ? undefined : Number(v) })}
             />
             <Input
               label="Lead days"
               type="number"
               value={data.defaultReminderLeadDays}
-              onChange={(v) => setData({ ...data, defaultReminderLeadDays: Number(v) })}
+              onChange={(v) => setData({ ...data, defaultReminderLeadDays: v === '' ? undefined : Number(v) })}
             />
           </div>
         </Card>

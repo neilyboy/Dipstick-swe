@@ -129,7 +129,19 @@ function InventoryForm({
   onBack: () => void;
   onSaved: () => void;
 }) {
-  const [data, setData] = useState({
+  const [data, setData] = useState<{
+    name: string;
+    category: string;
+    brand: string;
+    partNumber: string;
+    barcode: string;
+    quantity?: number;
+    unitType: string;
+    lowStockThreshold?: number;
+    costPerUnit: string;
+    storageLocation: string;
+    notes: string;
+  }>({
     name: '',
     category: 'oil',
     brand: '',
@@ -148,8 +160,8 @@ function InventoryForm({
     try {
       await api.post('/inventory', {
         ...data,
-        quantity: Number(data.quantity),
-        lowStockThreshold: Number(data.lowStockThreshold),
+        quantity: Number(data.quantity) || 0,
+        lowStockThreshold: Number(data.lowStockThreshold) || 0,
         costPerUnit: data.costPerUnit ? Number(data.costPerUnit) : undefined
       });
       toast.success('Inventory added');
@@ -189,9 +201,9 @@ function InventoryForm({
         <Input label="Brand" value={data.brand} onChange={(v) => setData({ ...data, brand: v })} />
         <Input label="Part number" value={data.partNumber} onChange={(v) => setData({ ...data, partNumber: v })} />
         <Input label="Barcode" value={data.barcode} onChange={(v) => setData({ ...data, barcode: v })} />
-        <Input label="Quantity" type="number" value={data.quantity} onChange={(v) => setData({ ...data, quantity: Number(v) })} />
+        <Input label="Quantity" type="number" value={data.quantity} onChange={(v) => setData({ ...data, quantity: v === '' ? undefined : Number(v) })} />
         <Input label="Unit" value={data.unitType} onChange={(v) => setData({ ...data, unitType: v })} />
-        <Input label="Low stock threshold" type="number" value={data.lowStockThreshold} onChange={(v) => setData({ ...data, lowStockThreshold: Number(v) })} />
+        <Input label="Low stock threshold" type="number" value={data.lowStockThreshold} onChange={(v) => setData({ ...data, lowStockThreshold: v === '' ? undefined : Number(v) })} />
         <Input label="Cost per unit" type="number" step="0.01" value={data.costPerUnit} onChange={(v) => setData({ ...data, costPerUnit: v })} />
         <Input label="Storage" value={data.storageLocation} onChange={(v) => setData({ ...data, storageLocation: v })} />
       </div>

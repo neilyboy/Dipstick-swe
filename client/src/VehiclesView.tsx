@@ -522,7 +522,7 @@ function VehicleForm({
 
       <Input label="Display name" value={data.displayName} onChange={(v) => setData({ ...data, displayName: v })} />
       <div className="grid grid-cols-2 gap-3">
-        <Input label="Year" type="number" value={data.year} onChange={(v) => setData({ ...data, year: Number(v) })} />
+        <Input label="Year" type="number" value={data.year} onChange={(v) => setData({ ...data, year: v === '' ? undefined : Number(v) })} />
         <Input label="Make" value={data.make} onChange={(v) => setData({ ...data, make: v })} />
         <Input label="Model" value={data.model} onChange={(v) => setData({ ...data, model: v })} />
         <Input label="Engine" value={data.engine} onChange={(v) => setData({ ...data, engine: v })} />
@@ -550,7 +550,7 @@ function VehicleForm({
           label="Current mileage"
           type="number"
           value={data.currentMileage}
-          onChange={(v) => setData({ ...data, currentMileage: Number(v) })}
+          onChange={(v) => setData({ ...data, currentMileage: v === '' ? undefined : Number(v) })}
         />
       </div>
 
@@ -566,10 +566,10 @@ function VehicleForm({
       <div className="space-y-3 pt-4 border-t border-white/5">
         <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wider">Intervals</h3>
         <div className="grid grid-cols-2 gap-3">
-          <Input label="Miles" type="number" value={data.intervalMiles} onChange={(v) => setData({ ...data, intervalMiles: Number(v) })} />
-          <Input label="Months" type="number" value={data.intervalMonths} onChange={(v) => setData({ ...data, intervalMonths: Number(v) })} />
-          <Input label="Lead miles" type="number" value={data.reminderLeadMiles} onChange={(v) => setData({ ...data, reminderLeadMiles: Number(v) })} />
-          <Input label="Lead days" type="number" value={data.reminderLeadDays} onChange={(v) => setData({ ...data, reminderLeadDays: Number(v) })} />
+          <Input label="Miles" type="number" value={data.intervalMiles} onChange={(v) => setData({ ...data, intervalMiles: v === '' ? undefined : Number(v) })} />
+          <Input label="Months" type="number" value={data.intervalMonths} onChange={(v) => setData({ ...data, intervalMonths: v === '' ? undefined : Number(v) })} />
+          <Input label="Lead miles" type="number" value={data.reminderLeadMiles} onChange={(v) => setData({ ...data, reminderLeadMiles: v === '' ? undefined : Number(v) })} />
+          <Input label="Lead days" type="number" value={data.reminderLeadDays} onChange={(v) => setData({ ...data, reminderLeadDays: v === '' ? undefined : Number(v) })} />
         </div>
       </div>
 
@@ -591,7 +591,19 @@ function ServiceForm({
   onBack: () => void;
   onSaved: () => void;
 }) {
-  const [data, setData] = useState({
+  const [data, setData] = useState<{
+    serviceDate: string;
+    mileage?: number;
+    oilBrand: string;
+    oilProduct: string;
+    oilViscosity: string;
+    oilQuantity?: number;
+    filterBrand: string;
+    filterModel: string;
+    performedBy: string;
+    cost: string;
+    notes: string;
+  }>({
     serviceDate: new Date().toISOString().split('T')[0],
     mileage: vehicle.currentMileage ?? 0,
     oilBrand: '',
@@ -621,11 +633,11 @@ function ServiceForm({
       const form = new FormData();
       form.append('vehicleId', vehicle.id);
       form.append('serviceDate', new Date(data.serviceDate).toISOString());
-      form.append('mileage', String(data.mileage));
+      form.append('mileage', String(data.mileage ?? 0));
       form.append('oilBrand', data.oilBrand);
       form.append('oilProduct', data.oilProduct);
       form.append('oilViscosity', data.oilViscosity);
-      form.append('oilQuantity', String(data.oilQuantity));
+      form.append('oilQuantity', String(data.oilQuantity ?? 0));
       form.append('filterBrand', data.filterBrand);
       form.append('filterModel', data.filterModel);
       form.append('performedBy', data.performedBy);
@@ -661,7 +673,7 @@ function ServiceForm({
           label="Mileage"
           type="number"
           value={data.mileage}
-          onChange={(v) => setData({ ...data, mileage: Number(v) })}
+          onChange={(v) => setData({ ...data, mileage: v === '' ? undefined : Number(v) })}
         />
       </div>
 
@@ -671,7 +683,7 @@ function ServiceForm({
           <Input label="Brand" value={data.oilBrand} onChange={(v) => setData({ ...data, oilBrand: v })} />
           <Input label="Product" value={data.oilProduct} onChange={(v) => setData({ ...data, oilProduct: v })} />
           <Input label="Viscosity" value={data.oilViscosity} onChange={(v) => setData({ ...data, oilViscosity: v })} />
-          <Input label="Quantity" type="number" step="0.1" value={data.oilQuantity} onChange={(v) => setData({ ...data, oilQuantity: Number(v) })} />
+          <Input label="Quantity" type="number" step="0.1" value={data.oilQuantity} onChange={(v) => setData({ ...data, oilQuantity: v === '' ? undefined : Number(v) })} />
         </div>
       </div>
 
