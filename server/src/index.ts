@@ -428,20 +428,24 @@ app.get('/api/exports/vehicle/:id/pdf', async (req, res) => {
         }
 
         if (natW > 0 && natH > 0) {
-          // Cover image as full-width banner, crop to header height
-          const scale = Math.max(W / natW, headerH / natH);
+          // Cover image: fit to header height, right-aligned so car is visible
+          const scale = headerH / natH;
           const drawW = natW * scale;
-          const drawH = natH * scale;
-          const imgX = (W - drawW) / 2;
-          const imgY = (headerH - drawH) / 2;
+          const drawH = headerH;
+          const imgX = W - drawW;
+          const imgY = 0;
 
           doc.save();
           doc.rect(0, 0, W, headerH).clip();
           doc.image(photoPath, imgX, imgY, { width: drawW, height: drawH });
           doc.restore();
 
-          // Dark gradient overlay for text readability
-          const grad = doc.linearGradient(0, 0, W, 0).stop(0, 'rgba(11,15,25,0.85)').stop(0.6, 'rgba(11,15,25,0.5)').stop(1, 'rgba(11,15,25,0.3)');
+          // Strong left-to-right dark gradient: opaque on left for text, transparent on right
+          const grad = doc.linearGradient(0, 0, W, 0)
+            .stop(0, '#0B0F19')
+            .stop(0.45, 'rgba(11,15,25,0.92)')
+            .stop(0.7, 'rgba(11,15,25,0.6)')
+            .stop(1, 'rgba(11,15,25,0.15)');
           doc.rect(0, 0, W, headerH).fill(grad);
         }
       } catch {
