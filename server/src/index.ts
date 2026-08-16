@@ -598,6 +598,31 @@ app.post('/api/backups/import', upload.single('backup'), async (req, res) => {
       }
     }
 
+    // Convert date strings back to Date objects for Prisma
+    const dateFields: Record<string, string[]> = {
+      Vehicle: ['createdAt', 'updatedAt'],
+      ServiceRecord: ['serviceDate', 'nextDueDate', 'createdAt', 'updatedAt'],
+      InventoryItem: ['createdAt', 'updatedAt'],
+      Receipt: ['receiptDate', 'createdAt'],
+      Setting: []
+    };
+
+    function fixDates(table: string, records: any[]) {
+      const fields = dateFields[table] || [];
+      for (const r of records) {
+        for (const f of fields) {
+          if (r[f] && typeof r[f] === 'string') {
+            r[f] = new Date(r[f]);
+          }
+        }
+      }
+    }
+
+    if (data.vehicles) fixDates('Vehicle', data.vehicles);
+    if (data.services) fixDates('ServiceRecord', data.services);
+    if (data.inventory) fixDates('InventoryItem', data.inventory);
+    if (data.receipts) fixDates('Receipt', data.receipts);
+
     // Wipe and restore database
     await prisma.$transaction([
       prisma.serviceRecord.deleteMany(),
@@ -635,6 +660,7 @@ app.post('/api/backups/import', upload.single('backup'), async (req, res) => {
 
     res.json({ success: true, message: 'Backup restored successfully' });
   } catch (err) {
+    console.error('Backup import error:', err);
     res.status(500).json({ error: 'Import failed', message: String(err) });
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });

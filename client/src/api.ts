@@ -7,7 +7,9 @@ export const api = axios.create({
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    const msg = err.response?.data?.error || err.message || 'Network error';
-    return Promise.reject(msg);
+    const status = err.response?.status;
+    const data = err.response?.data;
+    const msg = data?.error || data?.message || err.message || 'Network error';
+    return Promise.reject(status ? `${msg} (status ${status})` : msg);
   }
 );

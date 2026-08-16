@@ -72,7 +72,7 @@ export function SettingsView({ settings, onRefresh }: SettingsViewProps) {
       toast.success('Backup restored');
       onRefresh();
     } catch (err) {
-      toast.error(String(err));
+      toast.error(`Import failed: ${String(err)}`);
     } finally {
       setImporting(false);
       e.target.value = '';
