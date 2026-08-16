@@ -4,9 +4,10 @@ import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
-import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
+import { ZipArchive } from 'archiver';
+import AdmZip from 'adm-zip';
 import { PrismaClient } from '@prisma/client';
 import PDFDocument from 'pdfkit';
 import { createWorker } from 'tesseract.js';
@@ -540,27 +541,28 @@ app.get('/api/backups/export', async (_req, res) => {
   ]);
 
   const data = { vehicles, services, inventory, receipts, settings, exportedAt: new Date() };
-  const tmpDir = path.join(os.tmpdir(), 'dipstick-backup-' + uuid());
-  fs.mkdirSync(tmpDir, { recursive: true });
 
-  // Write JSON data
-  fs.writeFileSync(path.join(tmpDir, 'backup.json'), JSON.stringify(data, null, 2));
+  // Create zip in memory using archiver
+  const archive = new ZipArchive({ zlib: { level: 9 } });
+  const chunks: Buffer[] = [];
+  archive.on('data', (chunk: Buffer) => chunks.push(chunk));
 
-  // Copy uploads directory
-  const uploadsCopy = path.join(tmpDir, 'uploads');
+  // Add JSON data
+  archive.append(JSON.stringify(data, null, 2), { name: 'backup.json' });
+
+  // Add uploads directory
   if (fs.existsSync(uploadDir)) {
-    execSync(`cp -r "${uploadDir}" "${uploadsCopy}"`);
-  } else {
-    fs.mkdirSync(uploadsCopy, { recursive: true });
+    const files = fs.readdirSync(uploadDir);
+    for (const file of files) {
+      const filePath = path.join(uploadDir, file);
+      if (fs.statSync(filePath).isFile()) {
+        archive.file(filePath, { name: `uploads/${file}` });
+      }
+    }
   }
 
-  // Create zip
-  const zipPath = path.join(tmpDir, 'dipstick-backup.zip');
-  execSync(`cd "${tmpDir}" && zip -r "${zipPath}" .`);
-
-  // Send and cleanup
-  const zipBuf = fs.readFileSync(zipPath);
-  fs.rmSync(tmpDir, { recursive: true, force: true });
+  await archive.finalize();
+  const zipBuf = Buffer.concat(chunks);
 
   res.setHeader('Content-Type', 'application/zip');
   res.setHeader('Content-Disposition', 'attachment; filename="dipstick-backup.zip"');
@@ -574,7 +576,10 @@ app.post('/api/backups/import', upload.single('backup'), async (req, res) => {
   const tmpDir = path.join(os.tmpdir(), 'dipstick-restore-' + uuid());
   try {
     fs.mkdirSync(tmpDir, { recursive: true });
-    execSync(`unzip -o "${file.path}" -d "${tmpDir}"`);
+
+    // Extract zip using adm-zip (pure JS, no system binaries)
+    const zip = new AdmZip(file.path);
+    zip.extractAllTo(tmpDir, true);
 
     const jsonPath = path.join(tmpDir, 'backup.json');
     if (!fs.existsSync(jsonPath)) {
@@ -587,7 +592,10 @@ app.post('/api/backups/import', upload.single('backup'), async (req, res) => {
     const uploadsSrc = path.join(tmpDir, 'uploads');
     if (fs.existsSync(uploadsSrc)) {
       fs.mkdirSync(uploadDir, { recursive: true });
-      execSync(`cp -rf "${uploadsSrc}/"* "${uploadDir}/" 2>/dev/null || true`);
+      const uploadFiles = fs.readdirSync(uploadsSrc);
+      for (const f of uploadFiles) {
+        fs.copyFileSync(path.join(uploadsSrc, f), path.join(uploadDir, f));
+      }
     }
 
     // Wipe and restore database
