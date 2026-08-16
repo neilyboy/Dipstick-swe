@@ -464,70 +464,23 @@ app.get('/api/exports/vehicle/:id/pdf', async (req, res) => {
   doc.font('Helvetica').fontSize(10).fillColor('#cbd5e1').text(subtitle, 50, 50);
   doc.strokeColor('#38bdf8').lineWidth(1.5).moveTo(50, 64).lineTo(160, 64).stroke();
 
-  const metaY = 70;
-  const metaParts: string[] = [];
-  if (vehicle.vin) metaParts.push(`VIN: ${vehicle.vin}`);
-  if (vehicle.currentMileage != null) metaParts.push(`${vehicle.currentMileage.toLocaleString()} mi`);
-  if (metaParts.length > 0) {
-    doc.font('Helvetica').fontSize(8).fillColor('#94a3b8').text(metaParts.join('  ·  '), 50, metaY);
-  }
+  // ─── COMPACT INFO LINE ─────────────────────────────────────────────────────
+  const infoParts: string[] = [];
+  if (vehicle.year) infoParts.push(String(vehicle.year));
+  if (vehicle.make) infoParts.push(vehicle.make);
+  if (vehicle.model) infoParts.push(vehicle.model);
+  if (vehicle.engine) infoParts.push(vehicle.engine);
+  else if (vinDetails?.EngineCylinders) infoParts.push(`${vinDetails.EngineCylinders}cyl${vinDetails.DisplacementL ? ` ${vinDetails.DisplacementL}L` : ''}`);
+  if (vehicle.licensePlate) infoParts.push(`PLT: ${vehicle.licensePlate}`);
+  if (vehicle.vin) infoParts.push(`VIN: ${vehicle.vin}`);
+  if (vehicle.currentMileage != null) infoParts.push(`${vehicle.currentMileage.toLocaleString()} mi`);
+  if (vehicle.oilBrandPref || vehicle.oilViscosity) infoParts.push(`Oil: ${[vehicle.oilBrandPref, vehicle.oilViscosity].filter(Boolean).join(' ')}`);
 
-  // ─── VEHICLE INFO CARD ─────────────────────────────────────────────────────
-  let y = 110;
-  doc.fillColor('#f8fafc').strokeColor('#e2e8f0').lineWidth(1).roundedRect(40, y, W - 80, 100, 8).fillAndStroke();
-
-  const info: { label: string; value: string }[] = [
-    { label: 'Year', value: vehicle.year ? String(vehicle.year) : '-' },
-    { label: 'Make', value: vehicle.make || '-' },
-    { label: 'Model', value: vehicle.model || '-' },
-    { label: 'Engine', value: vehicle.engine || (vinDetails?.EngineCylinders ? `${vinDetails.EngineCylinders}cyl ${vinDetails.DisplacementL ? `${vinDetails.DisplacementL}L` : ''}`.trim() : '-') },
-    { label: 'License plate', value: vehicle.licensePlate || '-' },
-    { label: 'VIN', value: vehicle.vin || '-' },
-    { label: 'Mileage', value: vehicle.currentMileage != null ? `${vehicle.currentMileage.toLocaleString()} mi` : '-' },
-    { label: 'Oil', value: [vehicle.oilBrandPref, vehicle.oilViscosity].filter(Boolean).join(' ') || '-' }
-  ];
-
-  let cx = 60;
-  let rowY = y + 15;
-  info.forEach((item, i) => {
-    const col = i % 4;
-    const x = 60 + col * 125;
-    if (i > 0 && col === 0) rowY += 55;
-    doc.font('Helvetica-Bold').fontSize(7).fillColor('#64748b').text(item.label.toUpperCase(), x, rowY);
-    doc.font('Helvetica').fontSize(9).fillColor('#0f172a').text(item.value, x, rowY + 12, { width: 110, lineBreak: true });
-  });
-
-  // ─── VIN-DERIVED DETAILS ───────────────────────────────────────────────────
-  y = 240;
-  if (vinDetails) {
-    doc.font('Helvetica-Bold').fontSize(15).fillColor('#0f172a').text('Vehicle details from VIN', 40, y);
-    doc.strokeColor('#38bdf8').lineWidth(2).moveTo(40, y + 18).lineTo(250, y + 18).stroke();
-
-    const details: { label: string; value?: string }[] = [
-      { label: 'Vehicle type', value: vinDetails.VehicleType },
-      { label: 'Body class', value: vinDetails.BodyClass },
-      { label: 'Drive type', value: vinDetails.DriveType },
-      { label: 'Fuel type', value: vinDetails.FuelTypePrimary },
-      { label: 'Transmission', value: vinDetails.TransmissionStyle },
-      { label: 'Doors', value: vinDetails.Doors },
-      { label: 'Seats', value: vinDetails.Seats },
-      { label: 'Trim', value: vinDetails.Trim }
-    ];
-
-    const detailRows = details.filter((d) => d.value).map((d) => ({ ...d, value: String(d.value) }));
-    doc.fillColor('#f8fafc').strokeColor('#e2e8f0').roundedRect(40, y + 30, W - 80, 60, 8).fillAndStroke();
-
-    detailRows.forEach((item, i) => {
-      const col = i % 4;
-      const x = 60 + col * 125;
-      const ry = y + 40 + Math.floor(i / 4) * 26;
-      doc.font('Helvetica-Bold').fontSize(7).fillColor('#64748b').text(item.label.toUpperCase(), x, ry);
-      doc.font('Helvetica').fontSize(9).fillColor('#0f172a').text(item.value, x, ry + 11, { width: 110 });
-    });
-    y += 110;
-  }
+  let y = 108;
+  doc.font('Helvetica').fontSize(8).fillColor('#64748b').text(infoParts.join('  ·  '), 50, y, { width: W - 100 });
 
   // ─── SERVICE HISTORY TABLE ─────────────────────────────────────────────────
+  y = 128;
   doc.font('Helvetica-Bold').fontSize(15).fillColor('#0f172a').text('Service History', 40, y);
   doc.strokeColor('#38bdf8').lineWidth(2).moveTo(40, y + 18).lineTo(180, y + 18).stroke();
 
