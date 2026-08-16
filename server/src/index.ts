@@ -402,8 +402,15 @@ app.get('/api/exports/vehicle/:id/pdf', async (req, res) => {
   const H = doc.page.height;
 
   // ─── HEADER ────────────────────────────────────────────────────────────────
-  const headerH = 90;
+  const headerH = 110;
+  const imgAreaW = 200;       // right-side image area width
+  const textAreaW = W - imgAreaW; // left-side text panel width
 
+  // Left panel: solid dark background (always readable)
+  const grad = doc.linearGradient(0, 0, textAreaW, 0).stop(0, '#0B0F19').stop(1, '#1e293b');
+  doc.rect(0, 0, textAreaW, headerH).fill(grad);
+
+  // Right panel: cover image (cover-crop to fill the area), or dark fallback
   if (vehicle.coverPhoto) {
     const photoPath = path.join(uploadDir, vehicle.coverPhoto);
     if (fs.existsSync(photoPath)) {
@@ -428,45 +435,44 @@ app.get('/api/exports/vehicle/:id/pdf', async (req, res) => {
         }
 
         if (natW > 0 && natH > 0) {
-          // Cover image: fit to header height, right-aligned so car is visible
-          const scale = headerH / natH;
+          // Cover-crop: scale to fill area, center crop
+          const scale = Math.max(imgAreaW / natW, headerH / natH);
           const drawW = natW * scale;
-          const drawH = headerH;
-          const imgX = W - drawW;
-          const imgY = 0;
+          const drawH = natH * scale;
+          const imgX = textAreaW + (imgAreaW - drawW) / 2;
+          const imgY = (headerH - drawH) / 2;
 
           doc.save();
-          doc.rect(0, 0, W, headerH).clip();
+          doc.rect(textAreaW, 0, imgAreaW, headerH).clip();
           doc.image(photoPath, imgX, imgY, { width: drawW, height: drawH });
           doc.restore();
 
-          // Strong left-to-right dark gradient: opaque on left for text, transparent on right
-          const grad = doc.linearGradient(0, 0, W, 0)
-            .stop(0, '#0B0F19')
-            .stop(0.45, 'rgba(11,15,25,0.92)')
-            .stop(0.7, 'rgba(11,15,25,0.6)')
-            .stop(1, 'rgba(11,15,25,0.15)');
-          doc.rect(0, 0, W, headerH).fill(grad);
+          // Subtle gradient on left edge of image for smooth transition
+          const blendGrad = doc.linearGradient(textAreaW, 0, textAreaW + 40, 0)
+            .stop(0, 'rgba(11,15,25,0.6)').stop(1, 'rgba(11,15,25,0)');
+          doc.rect(textAreaW, 0, 40, headerH).fill(blendGrad);
         }
       } catch {
-        // ignore bad/corrupt image
+        // ignore bad/corrupt image — fallback below
       }
     }
   }
 
+  // Fallback: if no image or image failed, fill right area with dark gradient too
   if (!vehicle.coverPhoto) {
-    const grad = doc.linearGradient(0, 0, W, headerH).stop(0, '#0B0F19').stop(1, '#1e293b');
-    doc.rect(0, 0, W, headerH).fill(grad);
+    const grad2 = doc.linearGradient(textAreaW, 0, W, 0).stop(0, '#1e293b').stop(1, '#0B0F19');
+    doc.rect(textAreaW, 0, imgAreaW, headerH).fill(grad2);
   }
 
-  doc.font('Helvetica-Bold').fontSize(7).fillColor('#94a3b8').text('DIPSTICK SERVICE HISTORY', 50, 12);
+  // ─── HEADER TEXT (on left panel) ───────────────────────────────────────────
+  doc.font('Helvetica-Bold').fontSize(7).fillColor('#94a3b8').text('DIPSTICK SERVICE HISTORY', 40, 14);
 
   const title = `${vehicle.displayName}`;
   const subtitle = `${vehicle.year ?? ''} ${vehicle.make ?? ''} ${vehicle.model ?? ''}`.trim() || 'Vehicle profile';
 
-  doc.font('Helvetica-Bold').fontSize(18).fillColor('#ffffff').text(title, 50, 26);
-  doc.font('Helvetica').fontSize(10).fillColor('#cbd5e1').text(subtitle, 50, 50);
-  doc.strokeColor('#38bdf8').lineWidth(1.5).moveTo(50, 64).lineTo(160, 64).stroke();
+  doc.font('Helvetica-Bold').fontSize(20).fillColor('#ffffff').text(title, 40, 30, { width: textAreaW - 60 });
+  doc.font('Helvetica').fontSize(10).fillColor('#cbd5e1').text(subtitle, 40, 58, { width: textAreaW - 60 });
+  doc.strokeColor('#38bdf8').lineWidth(1.5).moveTo(40, 74).lineTo(160, 74).stroke();
 
   // ─── COMPACT INFO LINE ─────────────────────────────────────────────────────
   const infoParts: string[] = [];
@@ -480,11 +486,11 @@ app.get('/api/exports/vehicle/:id/pdf', async (req, res) => {
   if (vehicle.currentMileage != null) infoParts.push(`${vehicle.currentMileage.toLocaleString()} mi`);
   if (vehicle.oilBrandPref || vehicle.oilViscosity) infoParts.push(`Oil: ${[vehicle.oilBrandPref, vehicle.oilViscosity].filter(Boolean).join(' ')}`);
 
-  let y = 108;
+  let y = 128;
   doc.font('Helvetica').fontSize(8).fillColor('#64748b').text(infoParts.join('  ·  '), 50, y, { width: W - 100 });
 
   // ─── SERVICE HISTORY TABLE ─────────────────────────────────────────────────
-  y = 128;
+  y = 148;
   doc.font('Helvetica-Bold').fontSize(15).fillColor('#0f172a').text('Service History', 40, y);
   doc.strokeColor('#38bdf8').lineWidth(2).moveTo(40, y + 18).lineTo(180, y + 18).stroke();
 
