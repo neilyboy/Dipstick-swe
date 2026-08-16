@@ -402,46 +402,18 @@ app.get('/api/exports/vehicle/:id/pdf', async (req, res) => {
   const H = doc.page.height;
 
   // ─── HEADER ────────────────────────────────────────────────────────────────
-  const headerH = 130;
-  const grad = doc.linearGradient(0, 0, W, headerH).stop(0, '#0B0F19').stop(1, '#1e293b');
-  doc.rect(0, 0, W, headerH).fill(grad);
-
-  doc.font('Helvetica-Bold').fontSize(8).fillColor('#94a3b8').text('Dipstick Service History', 50, 15);
-
-  const title = `${vehicle.displayName}`;
-  const subtitle = `${vehicle.year ?? ''} ${vehicle.make ?? ''} ${vehicle.model ?? ''}`.trim() || 'Vehicle profile';
-
-  doc.font('Helvetica-Bold').fontSize(22).fillColor('#ffffff').text(title, 50, 35);
-  doc.font('Helvetica').fontSize(11).fillColor('#cbd5e1').text(subtitle, 50, 65);
-  doc.strokeColor('#38bdf8').lineWidth(2).moveTo(50, 82).lineTo(200, 82).stroke();
-
-  const metaY = 90;
-  if (vehicle.vin) {
-    doc.font('Helvetica').fontSize(9).fillColor('#94a3b8').text(`VIN: ${vehicle.vin}`, 50, metaY);
-  }
-  if (vehicle.currentMileage != null) {
-    doc.font('Helvetica').fontSize(9).fillColor('#94a3b8').text(`Mileage: ${vehicle.currentMileage.toLocaleString()} mi`, 50, metaY + 14);
-  }
+  const headerH = 90;
 
   if (vehicle.coverPhoto) {
     const photoPath = path.join(uploadDir, vehicle.coverPhoto);
     if (fs.existsSync(photoPath)) {
       try {
-        const maxW = 90;
-        const maxH = 90;
-        const imgX = W - 50 - maxW;
-        const imgY = 20;
-        const r = 6;
-
-        // Read image dimensions from file header
         const buf = fs.readFileSync(photoPath);
         let natW = 0, natH = 0;
         if (buf[0] === 0x89 && buf[1] === 0x50) {
-          // PNG: width at bytes 16-19, height at 20-23 (big-endian)
           natW = buf.readUInt32BE(16);
           natH = buf.readUInt32BE(20);
         } else if (buf[0] === 0xff && buf[1] === 0xd8) {
-          // JPEG: scan for SOF0/SOF2 marker
           let off = 2;
           while (off < buf.length - 1) {
             if (buf[off] !== 0xff) { off++; continue; }
@@ -456,20 +428,21 @@ app.get('/api/exports/vehicle/:id/pdf', async (req, res) => {
         }
 
         if (natW > 0 && natH > 0) {
-          // Calculate fitted dimensions preserving aspect ratio
-          const scale = Math.min(maxW / natW, maxH / natH);
-          const fitW = natW * scale;
-          const fitH = natH * scale;
+          // Cover image as full-width banner, crop to header height
+          const scale = Math.max(W / natW, headerH / natH);
+          const drawW = natW * scale;
+          const drawH = natH * scale;
+          const imgX = (W - drawW) / 2;
+          const imgY = (headerH - drawH) / 2;
 
-          // Clip to rounded rect, draw image, then stroke border
           doc.save();
-          doc.roundedRect(imgX, imgY, fitW, fitH, r).clip();
-          doc.image(photoPath, imgX, imgY, { width: fitW, height: fitH });
+          doc.rect(0, 0, W, headerH).clip();
+          doc.image(photoPath, imgX, imgY, { width: drawW, height: drawH });
           doc.restore();
 
-          doc.strokeColor('#38bdf8').lineWidth(1.5).opacity(0.5)
-            .roundedRect(imgX, imgY, fitW, fitH, r).stroke();
-          doc.opacity(1);
+          // Dark gradient overlay for text readability
+          const grad = doc.linearGradient(0, 0, W, 0).stop(0, 'rgba(11,15,25,0.85)').stop(0.6, 'rgba(11,15,25,0.5)').stop(1, 'rgba(11,15,25,0.3)');
+          doc.rect(0, 0, W, headerH).fill(grad);
         }
       } catch {
         // ignore bad/corrupt image
@@ -477,8 +450,30 @@ app.get('/api/exports/vehicle/:id/pdf', async (req, res) => {
     }
   }
 
+  if (!vehicle.coverPhoto) {
+    const grad = doc.linearGradient(0, 0, W, headerH).stop(0, '#0B0F19').stop(1, '#1e293b');
+    doc.rect(0, 0, W, headerH).fill(grad);
+  }
+
+  doc.font('Helvetica-Bold').fontSize(7).fillColor('#94a3b8').text('DIPSTICK SERVICE HISTORY', 50, 12);
+
+  const title = `${vehicle.displayName}`;
+  const subtitle = `${vehicle.year ?? ''} ${vehicle.make ?? ''} ${vehicle.model ?? ''}`.trim() || 'Vehicle profile';
+
+  doc.font('Helvetica-Bold').fontSize(18).fillColor('#ffffff').text(title, 50, 26);
+  doc.font('Helvetica').fontSize(10).fillColor('#cbd5e1').text(subtitle, 50, 50);
+  doc.strokeColor('#38bdf8').lineWidth(1.5).moveTo(50, 64).lineTo(160, 64).stroke();
+
+  const metaY = 70;
+  const metaParts: string[] = [];
+  if (vehicle.vin) metaParts.push(`VIN: ${vehicle.vin}`);
+  if (vehicle.currentMileage != null) metaParts.push(`${vehicle.currentMileage.toLocaleString()} mi`);
+  if (metaParts.length > 0) {
+    doc.font('Helvetica').fontSize(8).fillColor('#94a3b8').text(metaParts.join('  ·  '), 50, metaY);
+  }
+
   // ─── VEHICLE INFO CARD ─────────────────────────────────────────────────────
-  let y = 155;
+  let y = 110;
   doc.fillColor('#f8fafc').strokeColor('#e2e8f0').lineWidth(1).roundedRect(40, y, W - 80, 100, 8).fillAndStroke();
 
   const info: { label: string; value: string }[] = [
@@ -503,7 +498,7 @@ app.get('/api/exports/vehicle/:id/pdf', async (req, res) => {
   });
 
   // ─── VIN-DERIVED DETAILS ───────────────────────────────────────────────────
-  y = 285;
+  y = 240;
   if (vinDetails) {
     doc.font('Helvetica-Bold').fontSize(15).fillColor('#0f172a').text('Vehicle details from VIN', 40, y);
     doc.strokeColor('#38bdf8').lineWidth(2).moveTo(40, y + 18).lineTo(250, y + 18).stroke();
