@@ -14,7 +14,8 @@ import {
   Camera,
   Search,
   SlidersHorizontal,
-  X
+  X,
+  ImageIcon
 } from 'lucide-react';
 import { api } from './api';
 import { Button, Input, Card, Badge } from './Ui';
@@ -251,10 +252,16 @@ function VehicleDetail({
         ) : (
           <Car className="w-20 h-20 text-slate-600" />
         )}
-        <label className="absolute bottom-3 right-3 glass rounded-xl p-2 cursor-pointer hover:bg-white/10 transition">
-          <Camera className="w-4 h-4" />
-          <input type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
-        </label>
+        <div className="absolute bottom-3 right-3 flex gap-2">
+          <label className="glass rounded-xl p-2 cursor-pointer hover:bg-white/10 transition" title="Take photo">
+            <Camera className="w-4 h-4" />
+            <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhoto} />
+          </label>
+          <label className="glass rounded-xl p-2 cursor-pointer hover:bg-white/10 transition" title="Choose from gallery">
+            <ImageIcon className="w-4 h-4" />
+            <input type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
+          </label>
+        </div>
       </div>
 
       <div className="flex items-center justify-between">
@@ -543,20 +550,41 @@ function VehicleForm({
       </div>
 
       {!vehicle && (
-        <label className="block group cursor-pointer">
-          <span className="text-xs font-medium text-slate-400 uppercase tracking-wider block mb-1.5">Cover photo</span>
-          <input type="file" accept="image/*" className="hidden" onChange={handleFile} />
-          <div className="relative h-40 rounded-2xl border border-dashed border-white/20 bg-base-900/40 flex flex-col items-center justify-center overflow-hidden hover:border-accent-500/50 transition">
-            {previewUrl ? (
+        <div className="space-y-1.5">
+          <span className="text-xs font-medium text-slate-400 uppercase tracking-wider block">Cover photo</span>
+          {previewUrl ? (
+            <div className="relative h-40 rounded-2xl overflow-hidden">
               <img src={previewUrl} alt="" className="w-full h-full object-cover" />
-            ) : (
-              <>
-                <Camera className="w-8 h-8 text-slate-500 mb-2" />
-                <span className="text-sm text-slate-500">Tap to take a photo or choose from gallery</span>
-              </>
-            )}
-          </div>
-        </label>
+              <div className="absolute bottom-3 right-3 flex gap-2">
+                <label className="glass rounded-xl p-2 cursor-pointer hover:bg-white/10 transition" title="Retake photo">
+                  <Camera className="w-4 h-4" />
+                  <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFile} />
+                </label>
+                <label className="glass rounded-xl p-2 cursor-pointer hover:bg-white/10 transition" title="Choose from gallery">
+                  <ImageIcon className="w-4 h-4" />
+                  <input type="file" accept="image/*" className="hidden" onChange={handleFile} />
+                </label>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block group cursor-pointer">
+                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFile} />
+                <div className="h-32 rounded-2xl border border-dashed border-white/20 bg-base-900/40 flex flex-col items-center justify-center gap-1 hover:border-accent-500/50 transition">
+                  <Camera className="w-7 h-7 text-slate-500" />
+                  <span className="text-xs text-slate-500">Take photo</span>
+                </div>
+              </label>
+              <label className="block group cursor-pointer">
+                <input type="file" accept="image/*" className="hidden" onChange={handleFile} />
+                <div className="h-32 rounded-2xl border border-dashed border-white/20 bg-base-900/40 flex flex-col items-center justify-center gap-1 hover:border-accent-500/50 transition">
+                  <ImageIcon className="w-7 h-7 text-slate-500" />
+                  <span className="text-xs text-slate-500">Gallery</span>
+                </div>
+              </label>
+            </div>
+          )}
+        </div>
       )}
 
       <Input label="Display name" value={data.displayName} onChange={(v) => setData({ ...data, displayName: v })} />
@@ -744,22 +772,46 @@ function ServiceForm({
       <div className="space-y-3 pt-2 border-t border-white/5">
         <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wider">Attachments</h3>
         <div className="grid grid-cols-2 gap-3">
-          <label className="block group cursor-pointer">
-            <input type="file" accept="image/*" multiple className="hidden" onChange={handlePhotos} />
-            <div className="h-28 rounded-2xl border border-dashed border-white/20 bg-base-900/40 flex flex-col items-center justify-center gap-1 hover:border-accent-500/50 transition">
-              <Camera className="w-6 h-6 text-slate-500" />
-              <span className="text-sm text-slate-500">Photos (oil, filter)</span>
-              {photoFiles.length > 0 && <span className="text-xs text-accent-400">{photoFiles.length} selected</span>}
+          <div className="space-y-2">
+            <span className="text-xs text-slate-500 block">Photos (oil, filter)</span>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="block group cursor-pointer">
+                <input type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={handlePhotos} />
+                <div className="h-20 rounded-xl border border-dashed border-white/20 bg-base-900/40 flex flex-col items-center justify-center gap-0.5 hover:border-accent-500/50 transition">
+                  <Camera className="w-5 h-5 text-slate-500" />
+                  <span className="text-[10px] text-slate-500">Camera</span>
+                </div>
+              </label>
+              <label className="block group cursor-pointer">
+                <input type="file" accept="image/*" multiple className="hidden" onChange={handlePhotos} />
+                <div className="h-20 rounded-xl border border-dashed border-white/20 bg-base-900/40 flex flex-col items-center justify-center gap-0.5 hover:border-accent-500/50 transition">
+                  <ImageIcon className="w-5 h-5 text-slate-500" />
+                  <span className="text-[10px] text-slate-500">Gallery</span>
+                </div>
+              </label>
             </div>
-          </label>
-          <label className="block group cursor-pointer">
-            <input type="file" accept="image/*" multiple className="hidden" onChange={handleReceipts} />
-            <div className="h-28 rounded-2xl border border-dashed border-white/20 bg-base-900/40 flex flex-col items-center justify-center gap-1 hover:border-accent-500/50 transition">
-              <FileText className="w-6 h-6 text-slate-500" />
-              <span className="text-sm text-slate-500">Receipts</span>
-              {receiptFiles.length > 0 && <span className="text-xs text-accent-400">{receiptFiles.length} selected</span>}
+            {photoFiles.length > 0 && <span className="text-xs text-accent-400">{photoFiles.length} selected</span>}
+          </div>
+          <div className="space-y-2">
+            <span className="text-xs text-slate-500 block">Receipts</span>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="block group cursor-pointer">
+                <input type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={handleReceipts} />
+                <div className="h-20 rounded-xl border border-dashed border-white/20 bg-base-900/40 flex flex-col items-center justify-center gap-0.5 hover:border-accent-500/50 transition">
+                  <Camera className="w-5 h-5 text-slate-500" />
+                  <span className="text-[10px] text-slate-500">Camera</span>
+                </div>
+              </label>
+              <label className="block group cursor-pointer">
+                <input type="file" accept="image/*" multiple className="hidden" onChange={handleReceipts} />
+                <div className="h-20 rounded-xl border border-dashed border-white/20 bg-base-900/40 flex flex-col items-center justify-center gap-0.5 hover:border-accent-500/50 transition">
+                  <ImageIcon className="w-5 h-5 text-slate-500" />
+                  <span className="text-[10px] text-slate-500">Gallery</span>
+                </div>
+              </label>
             </div>
-          </label>
+            {receiptFiles.length > 0 && <span className="text-xs text-accent-400">{receiptFiles.length} selected</span>}
+          </div>
         </div>
       </div>
 
